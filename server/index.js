@@ -26,11 +26,23 @@ app.use(
 
 // Log incoming requests - Middleware
 app.use((req, res, next) => {
-  let httpVersion = req.httpVersionMajor + "." + req.httpVersionMinor;
-  let method = req.method;
-  let url = req.originalUrl;
-
-  global.logger.debug(`${method} ${url} HTTP/${httpVersion}`);
+  res.on("finish", () => {
+    let httpVersion = req.httpVersionMajor + "." + req.httpVersionMinor;
+    let status = res.statusCode;
+    let method = req.method;
+    let url = req.originalUrl;
+    global.logger.debug(`${method} ${url} HTTP/${httpVersion} - ${status}`);
+  });
+  next();
+});
+// Set up request termination function - Middleware
+app.use((req, res, next) => {
+  res.finish = (status, payload) => {
+    res.status(status).json({
+      ...(status >= 200 && status <= 300 && { data: payload }),
+      ...(status >= 400 && { error: payload }),
+    });
+  };
   next();
 });
 // Health check
