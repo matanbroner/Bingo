@@ -1,5 +1,5 @@
 const Hyperswarm = require("hyperswarm");
-const topics = require("../topics");
+const topics = require("../../relay/src/topics");
 
 const SECOND = 1000;
 
