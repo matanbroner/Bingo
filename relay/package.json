@@ -1,0 +1,20 @@
+{
+  "name": "relay",
+  "version": "1.0.0",
+  "description": "Used to offload key share generation and initial distribution",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.19.2",
+    "dotenv": "^16.0.0",
+    "express": "^4.17.3",
+    "hyperswarm": "^3.0.2",
+    "logger": "file:../tools/logger",
+    "secrets.js-grempe": "^2.0.0"
+  }
+}
