@@ -1,5 +1,6 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
+const uuidV4 = require("uuid").v4;
 
 const crypto = require("../crypto");
 const db = require("../db")
@@ -41,6 +42,7 @@ router.post("/", async (req, res) => {
     try {
         // Do not store password, pass it to relay server
         await db.dbInsert("users", {
+            id: uuidV4(),
             email: hashEmail
         })
         // TODO: Send password to relay server

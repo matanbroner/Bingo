@@ -1,10 +1,11 @@
 const express = require("express");
+const http = require("http");
 const bodyParser = require("body-parser");
 const dotenv = require("dotenv");
 const logger = require("logger");
-
 const db = require("./src/db");
 const api = require("./src/api");
+const initWebSocketServer = require("./src/wss");
 
 // Load .env file
 dotenv.config();
@@ -17,6 +18,11 @@ global.logger = log;
 
 // Initialize express app and API
 const app = express();
+const server = http.createServer(app);
+initWebSocketServer({
+  server,
+});
+
 app.use(bodyParser.json());
 app.use(
   bodyParser.urlencoded({
@@ -55,7 +61,7 @@ app.use("/api", api);
   try {
     await db.dbInit();
     global.logger.info("Database connection successful");
-    app.listen(process.env.PORT, () => {
+    server.listen(process.env.PORT, () => {
       global.logger.info(`Server listening on port ${process.env.PORT}`);
     });
   } catch (err) {

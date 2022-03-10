@@ -1,8 +1,9 @@
 const userTable = {
   name: "users",
   columns: {
-    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
-    email: "TEXT NOT NULL UNIQUE"
+    id: "TEXT NOT NULL UNIQUE",
+    email: "TEXT NOT NULL UNIQUE",
+    publicKey: "TEXT NOT NULL",
   },
   constraints: [],
 };

@@ -1,9 +1,16 @@
 module.exports = {
-    PEER_JOIN: "PEER_JOIN",
-    PEER_LEAVE: "PEER_LEAVE",
-    PEER_CHANNEL_READY: "PEER_CHANNEL_READY",
-    MESSAGE: "MESSAGE",
-    HANDSHAKE: "HANDSHAKE",
-    CHANNEL_CLOSE: "CHANNEL_CLOSE",
-    DATA: "DATA",
-}
+  PEER_JOIN: "peer-join",
+  PEER_LEAVE: "peer-leave",
+  PEER_CHANNEL_READY: "peer-channel-ready",
+  MESSAGE: "message",
+  HANDSHAKE: "handshake",
+  CHANNEL_CLOSE: "channel-close",
+  DATA: "data",
+  BROKER_CLOSED: "broker-closed",
+  BROKER_CHANNEL: "broker-channel",
+  SOCKET: {
+    CONNECTION: "connection",
+    CLOSE: "close",
+    ERROR: "error",
+  },
+};
