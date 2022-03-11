@@ -14,7 +14,7 @@ const decodePayloadById = async (id, payload) => {
     const { publicKey } = user;
     const buffer = Buffer.from(payload, "base64");
     const decoded = crypto.publicDecrypt(publicKey, buffer);
-    return Promise.resolve(decoded.toString("utf8"));
+    return Promise.resolve(decoded.toString());
   } catch (e) {
     return Promise.reject(e);
   }

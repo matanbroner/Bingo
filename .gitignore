@@ -1,5 +1,7 @@
 bingo_db
 relay_go
+public.pem
+private.pem
 # Logs
 logs
 *.log

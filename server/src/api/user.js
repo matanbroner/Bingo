@@ -11,9 +11,13 @@ router.post("/", async (req, res) => {
     const {
         email,
         password,
+        publicKey,
     } = req.body;
     if (!email || !password) {
         return res.finish(400, "Missing email or password");
+    }
+    if (!publicKey) {
+        return res.finish(400, "Missing public key");
     }
     // Validate email
     const isEmail = /^[^@]+@[^@]+\.[^@]+$/
@@ -43,7 +47,8 @@ router.post("/", async (req, res) => {
         // Do not store password, pass it to relay server
         await db.dbInsert("users", {
             id: uuidV4(),
-            email: hashEmail
+            email: hashEmail,
+            publicKey
         })
         // TODO: Send password to relay server
     res.finish(201, "OK");

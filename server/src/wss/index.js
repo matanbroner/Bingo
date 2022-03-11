@@ -1,8 +1,18 @@
 const WSS = require("ws").Server;
 const uuidV4 = require("uuid").v4;
 const MemoryCache = require("./cache").memory;
+const { decodePayloadById } = require("../crypto");
 
 const generateMessageId = () => uuidV4();
+
+const send = (ws, message) => {
+  ws.send(
+    JSON.stringify({
+      ...message,
+      messageId: generateMessageId(),
+    })
+  );
+};
 
 const identifyUserWs = async (wss, ws, json) => {
   // TODO: user should send a message with their id and the body of the message signed by their private key
@@ -11,40 +21,50 @@ const identifyUserWs = async (wss, ws, json) => {
   // ... user MUST pass the id of their device
   const { messageId, data } = json;
   const { id, payload } = data;
-  console.log("identifyUserWs", data);
   try {
-    const decoded = payload; // await decodePayloadById(id, payload)
-    let client = wss.cache.get(ws._id);
-    if (!client) {
-      // TODO: decide what to do if client is not found
-      // ... could this be due to a client getting purged from cache?
-      // ... for now we throw an error
-      throw new Error(`Client ${ws._id} not found`);
-    }
-    client.user = id;
+    let decoded = await decodePayloadById(id, payload);
+    global.logger.debug(`Decoded payload: ${decoded}`);
+    decoded = JSON.parse(decoded);
     if (!decoded.deviceId) {
-      throw new Error("Missing deviceId");
+      throw new Error("Invalid payload");
     }
-    client.devices.add(decoded.deviceId);
-    wss.cache.set(ws._id, client);
-    ws.send(
-      JSON.stringify({
-        messageId: generateMessageId(),
-        replyId: messageId,
-        type: "success",
-        data: null
-      })
-    );
+    ws._userId = id;
+    let client = wss.cache.get(id);
+    if (client) {
+      client.ws = ws;
+      client.active = true;
+      global.logger.info(
+        `Client ${id} reconnected, now connected to ${ws._id}`
+      );
+    } else {
+      global.logger.info(`Client ${id} connected to ${ws._id}`);
+      wss.cache.set(id, {
+        ws,
+        active: true,
+        user: id,
+        devices: new Set(),
+      });
+      client = wss.cache.get(id);
+    }
+    if (!client.devices.has(decoded.deviceId)) {
+      client.devices.add(decoded.deviceId);
+    } else {
+      global.logger.info(
+        `Client ${id} already connected to ${decoded.deviceId}`
+      );
+    }
+    send(ws, {
+      replyId: messageId,
+      type: "success",
+      data: null,
+    });
   } catch (e) {
-    ws.send(
-      JSON.stringify({
-        messageId: generateMessageId(),
-        replyId: messageId,
-        type: "error",
-        error: e.message,
-      })
-    );
-    console.error(e);
+    send(ws, {
+      replyId: messageId,
+      type: "error",
+      error: e.message,
+    });
+    global.logger.error(e);
   }
 };
 
@@ -58,32 +78,20 @@ module.exports = (options) => {
   wss.on("connection", (ws) => {
     // Assign a unique ID to the client
     ws._id = uuidV4();
-    wss.cache.set(ws._id, {
-      ws,
-      active: true,
-      user: null,
-      devices: new Set(),
+    send(ws, {
+      type: "id",
+      id: ws._id,
     });
-    ws.send(
-      JSON.stringify({
-        messageId: generateMessageId(),
-        type: "id",
-        id: ws._id,
-      })
-    );
 
     ws.on("message", (message) => {
       const data = JSON.parse(message);
       switch (data.type) {
         case "echo":
-          ws.send(
-            JSON.stringify({
-              messageId: generateMessageId(),
-              replyId: data.messageId,
-              type: "echo",
-              data: "OK",
-            })
-          );
+          send(ws, {
+            replyId: data.messageId,
+            type: "echo",
+            data: "OK",
+          });
           break;
         case "identify":
           identifyUserWs(wss, ws, data);
@@ -91,6 +99,16 @@ module.exports = (options) => {
         default:
           break;
       }
+    });
+
+    ws.on("close", () => {
+      // TODO: should the user be purged from cache?
+      // ... does that require the 4-way handshake each time a reconnection is attempted?
+      // ... figure out a better scheme to index cache, perhaps by userId, and purge after a certain time -
+      // ... if no new websocket is added.
+      global.logger.info(`Client ${ws._id} disconnected`);
+      // find the client in the cache
+      wss.cache.get(ws._userId).active = false;
     });
   });
 };
