@@ -28,7 +28,7 @@ ws.on("open", function open() {
           Buffer.from(
             JSON.stringify({
               deviceId: DEVICE_ID,
-            })
+            }).toString("base64")
           )
         ),
       },
