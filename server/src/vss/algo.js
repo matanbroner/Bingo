@@ -1,6 +1,6 @@
-// Secret sharing wrapper for relay server
+// Secret sharing handler
 // Currently using non-verifiable (ie. standard Shamir) secret sharing
-// Next iteration will use verifiable secret sharing
+// TODO: implement verifiable secret sharing
 
 const secrets = require("secrets.js-grempe");
 
