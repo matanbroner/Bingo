@@ -15,6 +15,10 @@ class MemoryCache {
   clear() {
     this._cache = {};
   }
+
+  active() {
+    return Object.entries(this._cache).filter(([key, value]) => value.active);
+  }
 }
 
 module.exports = {

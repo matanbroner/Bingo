@@ -15,6 +15,7 @@
     "dotenv": "^16.0.0",
     "express": "^4.17.3",
     "geoip-lite": "^1.4.3",
+    "lodash": "^4.17.21",
     "logger": "file:../tools/logger",
     "secrets.js-grempe": "^2.0.0",
     "sqlite3": "^5.0.2",

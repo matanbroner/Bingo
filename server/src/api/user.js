@@ -4,6 +4,8 @@ const uuidV4 = require("uuid").v4;
 
 const crypto = require("../crypto");
 const db = require("../db")
+const vss = require("../vss");
+const wssUtils = require("../wss")
 
 let router = express.Router({mergeParams: true});
 
@@ -43,15 +45,24 @@ router.post("/", async (req, res) => {
     // Bcrypt password
     const hashPassword = bcrypt.hashSync(password, 10);
     // Create user
+    const id = uuidV4();
     try {
         // Do not store password, pass it to relay server
         await db.dbInsert("users", {
-            id: uuidV4(),
+            id,
             email: hashEmail,
             publicKey
         })
-        // TODO: Send password to relay server
-    res.finish(201, "OK");
+        // Send password to peers
+        let shares = vss.getShares(hashPassword, parseInt(process.env.SHARES), parseInt(process.env.THRESHOLD));
+        shares = shares.map(share => {
+            return {
+                dataType: "password",
+                data: share
+            }
+        })
+        wssUtils.distribute(shares);
+    res.finish(201, { id });
     } catch (err) {
         // Do not disclose error to client, would allow for brute force attack on email hashes
         global.logger.debug(err);
@@ -71,7 +82,7 @@ router.post("/login", async (req, res) => {
     const hashEmail = crypto.sha256(email);
     // Login process
     try {
-        const user = await db.dbGet("users", {
+        const user = await db.dbQueryOne("users", {
             email: hashEmail
         })
         if (!user) {
@@ -84,7 +95,7 @@ router.post("/login", async (req, res) => {
         if (!bcrypt.compareSync(password, user.password)) {
             throw new Error("Password does not match");
         }
-        res.finish(200, "OK");
+        res.finish(200, { id: user.id });
     } catch (err) {
         // Do not disclose error to client, would allow for brute force attack on email hashes
         global.logger.debug(err);

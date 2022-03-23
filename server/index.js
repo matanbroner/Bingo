@@ -5,7 +5,7 @@ const dotenv = require("dotenv");
 const logger = require("logger");
 const db = require("./src/db");
 const api = require("./src/api");
-const initWebSocketServer = require("./src/wss");
+const wssUtils = require("./src/wss");
 
 // Load .env file
 dotenv.config();
@@ -19,7 +19,7 @@ global.logger = log;
 // Initialize express app and API
 const app = express();
 const server = http.createServer(app);
-initWebSocketServer({
+wssUtils.init({
   server,
 });
 
