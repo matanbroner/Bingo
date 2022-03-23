@@ -12,9 +12,36 @@ const DEVICE_ID = "a659fff6-d94f-4457-bdf9-5d602aa554ec";
 
 const launchClient = (id) => {
   const ws = new WebSocket(SERVER);
+  ws.storage = {};
   ws.on("open", function open() {
-    ws.on("message", function message(data) {
+    ws.on("message", function message(message) {
       console.log(`ID ${id} received: ${data}`);
+      message = JSON.parse(data);
+      switch (message.type) {
+        case "distribute": {
+          const { id, data } = message.data;
+          // rudimentary storage, in real version allow multiple
+          // ... pieces of data to be stored per user
+          ws.storage[id] = data;
+          break;
+        }
+        case "retrieve": {
+          const { query, retrievalId } = message.data;
+          // In real version we can utilize more complex queries
+          // ... for this version just use basic pKey
+          const data = ws.storage[query.id];
+          if (data) {
+            ws.send(
+              JSON.stringify({
+                messageId: generateMessageId(),
+                type: "retrieved",
+                data,
+                retrievalId
+              })
+            );
+          }
+        }
+      }
     });
     console.log(`Connected: ${id}`);
     ws.send(

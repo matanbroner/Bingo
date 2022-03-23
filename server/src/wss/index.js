@@ -167,7 +167,7 @@ module.exports = {
     }
     // TODO: send items to replication servers
   },
-  retrieve: (query) => {
+  retrieve: async(query) => {
     if (!wss) {
       throw new Error("WSS not initialized");
     }
@@ -175,8 +175,9 @@ module.exports = {
     if (activeSockets.length === 0) {
       throw new Error("No active peers");
     }
-    retrievalJobs[query.id] = {
-      id: query.id,
+    const retrievalId = uuidV4();
+    retrievalJobs[retrievalId] = {
+      id: retrievalId,
       createdAt: new Date(),
       updatedAt: new Date(),
       completedAt: null,
@@ -189,7 +190,10 @@ module.exports = {
     for (let peer of activeSockets) {
       send(peer.ws, {
         type: "retrieve",
-        data: query,
+        data: {
+          ...query,
+          retrievalId,
+        },
       });
     }
   },
