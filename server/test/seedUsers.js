@@ -2,7 +2,7 @@ const fs = require("fs");
 const uuidV4 = require("uuid").v4;
 const path = require("path");
 const crypto = require("../src/crypto");
-const db = require("../src/db");
+const db = require("db");
 
 // read public key from assets/id_rsa.pub
 const publicKey = fs.readFileSync(

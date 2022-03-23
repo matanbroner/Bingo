@@ -8,6 +8,4 @@ const userTable = {
   constraints: [],
 };
 
-module.exports = {
-  users: userTable,
-};
+module.exports = [userTable];

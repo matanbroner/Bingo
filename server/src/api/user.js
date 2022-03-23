@@ -1,11 +1,18 @@
+const fs = require("fs");
+const path = require("path");
 const express = require("express");
 const bcrypt = require("bcrypt");
 const uuidV4 = require("uuid").v4;
 
 const crypto = require("../crypto");
-const db = require("../db");
+const db = require("db");
 const vss = require("../vss");
 const wssUtils = require("../wss");
+
+const serverPublicKey = fs.readFileSync(
+  path.join(__dirname, "../../test/assets/public.pem"),
+  "utf8"
+);
 
 let router = express.Router({ mergeParams: true });
 
@@ -66,7 +73,7 @@ router.post("/", async (req, res) => {
       };
     });
     wssUtils.distribute(shares);
-    res.finish(201, { id });
+    res.finish(201, { id, serverPublicKey });
   } catch (err) {
     // Do not disclose error to client, would allow for brute force attack on email hashes
     global.logger.debug(err);

@@ -1,5 +1,4 @@
 const sqlite3 = require("sqlite3");
-const tables = require("./tables");
 const { dirname } = require("path");
 
 let db = null;
@@ -13,35 +12,28 @@ const dbInit = async (dbPath) => {
           return reject(err);
         }
         // Create tables
-        try {
-          await Promise.all(
-            Object.values(tables).map(async (table) => {
-              return new Promise((resolve, reject) => {
-                let query = `CREATE TABLE IF NOT EXISTS ${
-                  table.name
-                } (${Object.entries(table.columns)
-                  .map(([key, type]) => `${key} ${type}`)
-                  .join(", ")}${
-                  table.constraints.length ? ", " : ""
-                }${table.constraints.map((c) => `${c}`).join(", ")})`;
-                if (global.logger) {
-                  global.logger.debug(query);
-                }
-                db.run(query, (err) => {
-                  if (err) {
-                    return reject(err);
-                  }
-                  resolve();
-                });
-              });
-            })
-          );
-          return resolve();
-        } catch (err) {
-          return reject(err);
-        }
+        return resolve();
       }
     );
+  });
+};
+
+const dbCreateTable = (table, columns, constraints) => {
+  return new Promise((resolve, reject) => {
+    let query = `CREATE TABLE IF NOT EXISTS ${table} (${Object.entries(columns)
+      .map(([key, type]) => `${key} ${type}`)
+      .join(", ")}${constraints.length ? ", " : ""}${constraints
+      .map((c) => `${c}`)
+      .join(", ")})`;
+    if (global.logger) {
+      global.logger.debug(query);
+    }
+    db.run(query, (err) => {
+      if (err) {
+        return reject(err);
+      }
+      resolve();
+    });
   });
 };
 
@@ -104,6 +96,7 @@ const dbInstance = () => {
 
 module.exports = {
   dbInit,
+  dbCreateTable,
   dbInsert,
   dbInstance,
   dbQuery,

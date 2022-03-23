@@ -3,7 +3,8 @@ const http = require("http");
 const bodyParser = require("body-parser");
 const dotenv = require("dotenv");
 const logger = require("logger");
-const db = require("./src/db");
+const db = require("db");
+const dbTables = require("./src/db/tables");
 const api = require("./src/api");
 const wssUtils = require("./src/wss");
 
@@ -60,6 +61,11 @@ app.use("/api", api);
 (async () => {
   try {
     await db.dbInit();
+    await Promise.all(
+      dbTables.map((table) =>
+        db.dbCreateTable(table.name, table.columns, table.constraints)
+      )
+    );
     global.logger.info("Database connection successful");
     server.listen(process.env.PORT, () => {
       global.logger.info(`Server listening on port ${process.env.PORT}`);

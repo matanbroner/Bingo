@@ -1,4 +1,5 @@
 bingo_db
+peer_db
 relay_go
 public.pem
 private.pem
