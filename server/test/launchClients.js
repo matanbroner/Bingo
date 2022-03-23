@@ -15,28 +15,32 @@ const launchClient = (id) => {
   ws.storage = {};
   ws.on("open", function open() {
     ws.on("message", function message(message) {
-      console.log(`ID ${id} received: ${data}`);
-      message = JSON.parse(data);
+      console.log(`ID ${id} received: ${message}`);
+      message = JSON.parse(message);
       switch (message.type) {
         case "distribute": {
           const { id, data } = message.data;
           // rudimentary storage, in real version allow multiple
           // ... pieces of data to be stored per user
           ws.storage[id] = data;
+          console.log(`ID ${id} stored: ${data}`);
           break;
         }
         case "retrieve": {
           const { query, retrievalId } = message.data;
           // In real version we can utilize more complex queries
           // ... for this version just use basic pKey
-          const data = ws.storage[query.id];
-          if (data) {
+          const payload = ws.storage[query.id];
+          if (payload) {
+            console.log(`ID ${id} retrieved: ${payload}`);
             ws.send(
               JSON.stringify({
                 messageId: generateMessageId(),
                 type: "retrieved",
-                data,
-                retrievalId
+                data: {
+                  payload,
+                  retrievalId,
+                },
               })
             );
           }

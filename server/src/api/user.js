@@ -91,16 +91,27 @@ router.post("/login", async (req, res) => {
     }
 
     // Async fetch password from peers
-    const passwordShares = await wssUtils.retrieve({
-      id: user.id,
-      dataType: "password",
-    });
-
-    // Check if password matches
-    if (!bcrypt.compareSync(password, user.password)) {
-      throw new Error("Password does not match");
-    }
-    res.finish(200, { id: user.id });
+    await wssUtils.retrieve(
+      {
+        id: user.id,
+        dataType: "password",
+      },
+      (shares, error) => {
+        if (error) {
+          global.logger.error(error);
+          return res.finish(400, "Failed to retrieve password from peers");
+        }
+        const reconstructedPassword = vss.reconstructSecret(
+          shares,
+          parseInt(process.env.THRESHOLD)
+        );
+        // Check if password matches
+        if (!bcrypt.compareSync(password, reconstructedPassword)) {
+          return res.finish(400, "Password does not match");
+        }
+        return res.finish(200, { id: user.id });
+      }
+    );
   } catch (err) {
     // Do not disclose error to client, would allow for brute force attack on email hashes
     global.logger.debug(err);

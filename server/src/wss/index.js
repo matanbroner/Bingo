@@ -2,22 +2,12 @@ const WSS = require("ws").Server;
 const uuidV4 = require("uuid").v4;
 const _ = require("lodash");
 const MemoryCache = require("./cache").memory;
+const RetrievalJob = require("./jobs").retrieval;
 const { decodePayloadById } = require("../crypto");
 
 const generateMessageId = () => uuidV4();
 
 let wss = null;
-/*
-  Job Structure:
-  {
-    id: "",
-    createdAt: "",
-    updatedAt: "",
-    completedAt: "",
-    type: "",
-    data: []
-  }
-*/
 let retrievalJobs = {};
 
 const send = (ws, message) => {
@@ -85,6 +75,22 @@ const identifyUserWs = async (wss, ws, json) => {
 
 const acceptRetrievedData = async (wss, ws, json) => {
   global.logger.debug(`Accepting retrieved data: ${JSON.stringify(json)}`);
+  const { messageId, data } = json;
+  const { retrievalId, payload } = data;
+  if (!retrievalId) {
+    global.logger.error(`Invalid retrievalId: ${retrievalId}`);
+    return;
+  }
+  const job = retrievalJobs[retrievalId];
+  if (!job) {
+    global.logger.error(`Invalid retrievalId: ${retrievalId}`);
+    return;
+  }
+  // TODO: check for dataType being retrieved
+  if (job.active) {
+    job.push(payload);
+    global.logger.debug(`Retrieved data pushed to job: ${retrievalId}`);
+  }
 };
 
 module.exports = {
@@ -167,31 +173,29 @@ module.exports = {
     }
     // TODO: send items to replication servers
   },
-  retrieve: async(query) => {
+  retrieve: (query, cb) => {
     if (!wss) {
-      throw new Error("WSS not initialized");
+      cb(null, new Error("WSS not initialized"));
     }
     const activeSockets = wss.cache.active();
     if (activeSockets.length === 0) {
-      throw new Error("No active peers");
+      cb(null, new Error("No active peers"));
     }
     const retrievalId = uuidV4();
-    retrievalJobs[retrievalId] = {
-      id: retrievalId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      completedAt: null,
-      type: query.type,
-      data: [],
-    };
+    retrievalJobs[retrievalId] = new RetrievalJob(
+      retrievalId,
+      query,
+      parseInt(process.env.THRESHOLD),
+      cb
+    );
     // TODO: make the retieve mechanism more efficient
     // ... once we have a better distribution mechanism we can query only specific peers
     // ... for now we query all peers
-    for (let peer of activeSockets) {
+    for (let [_, peer] of activeSockets) {
       send(peer.ws, {
         type: "retrieve",
         data: {
-          ...query,
+          query,
           retrievalId,
         },
       });
