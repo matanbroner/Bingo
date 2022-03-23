@@ -28,7 +28,6 @@ const identifyUserWs = async (wss, ws, json) => {
   const { id, payload } = data;
   try {
     let decoded = await decodePayloadById(id, payload);
-    global.logger.debug(`Decoded payload: ${decoded}`);
     decoded = JSON.parse(decoded);
     if (!decoded.deviceId) {
       throw new Error("Invalid payload");
@@ -74,22 +73,31 @@ const identifyUserWs = async (wss, ws, json) => {
 };
 
 const acceptRetrievedData = async (wss, ws, json) => {
-  global.logger.debug(`Accepting retrieved data: ${JSON.stringify(json)}`);
   const { messageId, data } = json;
-  const { retrievalId, payload } = data;
-  if (!retrievalId) {
-    global.logger.error(`Invalid retrievalId: ${retrievalId}`);
-    return;
-  }
-  const job = retrievalJobs[retrievalId];
-  if (!job) {
-    global.logger.error(`Invalid retrievalId: ${retrievalId}`);
-    return;
-  }
-  // TODO: check for dataType being retrieved
-  if (job.active) {
-    job.push(payload);
-    global.logger.debug(`Retrieved data pushed to job: ${retrievalId}`);
+  const { id, retrievalId, payload } = data;
+  try {
+    let decoded = await decodePayloadById(id, payload);
+    if (!retrievalId) {
+      global.logger.error(`Invalid retrievalId: ${retrievalId}`);
+      return;
+    }
+    const job = retrievalJobs[retrievalId];
+    if (!job) {
+      global.logger.error(`Invalid retrievalId: ${retrievalId}`);
+      return;
+    }
+    // TODO: check for dataType being retrieved
+    if (job.active) {
+      job.push(decoded);
+      global.logger.debug(`Retrieved data pushed to job: ${retrievalId}`);
+    }
+  } catch (e) {
+    send(ws, {
+      replyId: messageId,
+      type: "error",
+      error: e.message,
+    });
+    global.logger.error(e);
   }
 };
 

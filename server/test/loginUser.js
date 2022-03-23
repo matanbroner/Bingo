@@ -8,18 +8,21 @@ const publicKey = fs.readFileSync(
   path.join(__dirname, "./assets/public.pem"),
   "utf8"
 );
-const email = "d369bd31-976b-4271-a97b-5db201f458e5@bingo.com";
+const email = "4d0649b2-a83c-4ac4-805c-96235c9aa649@bingo.com";
 const password = "Bingo123!";
 
 const loginUser = async (email, password, publicKey) => {
-  const response = await superagent
+  return superagent
     .post(`http://localhost:5000/api/user/login`)
     .set("Content-Type", "application/json")
     .send({ email, password });
-  return response;
 };
 
 (async () => {
-  const response = await loginUser(email, password, publicKey);
-  console.log(response.body);
+  try {
+    const response = await loginUser(email, password, publicKey);
+    console.log(response.body);
+  } catch (error) {
+    console.error(error.message);
+  }
 })();

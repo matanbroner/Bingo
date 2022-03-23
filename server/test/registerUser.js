@@ -8,31 +8,25 @@ const publicKey = fs.readFileSync(
   path.join(__dirname, "./assets/public.pem"),
   "utf8"
 );
-const email = "test@bingo.com";
 const password = "Bingo123!";
 
 const registerUser = async (email, password, publicKey) => {
-  const response = await superagent
+  return superagent
     .post(`http://localhost:5000/api/user`)
     .set("Content-Type", "application/json")
     .send({ email, password, publicKey });
-  return response;
 };
 
-const count = process.argv[2] || 1;
-
 (async () => {
-  let ids = [];
-  for (let i = 0; i < count; i++) {
-    // generate a random email
-    const _email = `${uuidV4()}@bingo.com`;
-    try {
-      const response = await registerUser(_email, password, publicKey);
-      ids.push(response.body.data.id);
-      console.log(`Registered ${_email}`);
-    } catch (err) {
-      console.log(`Error for ${_email}: ${err.message}`);
-    }
+  try {
+    const email = `${uuidV4()}@bingo.com`;
+    const response = await registerUser(email, password, publicKey);
+    const { id } = response.body.data;
+    console.log({
+        id,
+        email,
+    })
+  } catch (error) {
+    console.error(error.message);
   }
-  console.log(ids)
 })();

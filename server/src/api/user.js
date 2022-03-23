@@ -99,7 +99,7 @@ router.post("/login", async (req, res) => {
       (shares, error) => {
         if (error) {
           global.logger.error(error);
-          return res.finish(400, "Failed to retrieve password from peers");
+          return res.finish(500, "Failed to retrieve password from peers: " + error);
         }
         const reconstructedPassword = vss.reconstructSecret(
           shares,

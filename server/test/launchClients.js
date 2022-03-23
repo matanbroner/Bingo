@@ -10,6 +10,21 @@ const generateMessageId = () => uuidV4();
 const SERVER = "ws://localhost:5000";
 const DEVICE_ID = "a659fff6-d94f-4457-bdf9-5d602aa554ec";
 
+const encryptedPayload = (payload) =>
+  {
+    // if paylaod is an object, convert to string
+    if (typeof payload === "object") {
+      payload = JSON.stringify(payload);
+    }
+    return crypto.privateEncrypt(
+      {
+        key: privateKey,
+        passphrase: "bingo",
+      },
+      Buffer.from(payload.toString("base64"))
+    );
+  }
+
 const launchClient = (id) => {
   const ws = new WebSocket(SERVER);
   ws.storage = {};
@@ -19,11 +34,11 @@ const launchClient = (id) => {
       message = JSON.parse(message);
       switch (message.type) {
         case "distribute": {
-          const { id, data } = message.data;
+          const { id: userId, data } = message.data;
           // rudimentary storage, in real version allow multiple
           // ... pieces of data to be stored per user
-          ws.storage[id] = data;
-          console.log(`ID ${id} stored: ${data}`);
+          ws.storage[userId] = data;
+          console.log(`ID ${userId} stored: ${data}`);
           break;
         }
         case "retrieve": {
@@ -38,8 +53,9 @@ const launchClient = (id) => {
                 messageId: generateMessageId(),
                 type: "retrieved",
                 data: {
-                  payload,
+                  payload: encryptedPayload(payload),
                   retrievalId,
+                  id,
                 },
               })
             );
@@ -54,17 +70,9 @@ const launchClient = (id) => {
         type: "identify",
         data: {
           id,
-          payload: crypto.privateEncrypt(
-            {
-              key: privateKey,
-              passphrase: "bingo",
-            },
-            Buffer.from(
-              JSON.stringify({
-                deviceId: DEVICE_ID,
-              }).toString("base64")
-            )
-          ),
+          payload: encryptedPayload({
+            deviceId: DEVICE_ID,
+          }),
         },
       })
     );
