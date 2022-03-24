@@ -16,5 +16,12 @@
     "webpack": "^4.46.0",
     "webpack-cli": "^3.3.12",
     "webpack-merge": "^5.8.0"
+  },
+  "dependencies": {
+    "browser-fs-access": "^0.25.0",
+    "crypto": "^1.0.1",
+    "keypair": "^1.0.4",
+    "util": "^0.12.4",
+    "ws": "^8.5.0"
   }
 }
