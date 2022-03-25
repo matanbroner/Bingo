@@ -1,15 +1,15 @@
 const express = require("express");
 const http = require("http");
 const bodyParser = require("body-parser");
-const dotenv = require("dotenv");
+const dotenv = require("dotenv").config();
 const logger = require("logger");
 const db = require("db");
 const dbTables = require("./src/db/tables");
 const api = require("./src/api");
 const wssUtils = require("./src/wss");
 
-// Load .env file
-dotenv.config();
+const { mmh3 } = require("./src/crypto");
+
 const log = new logger.Logger({
   level: process.env.LOG_LEVEL,
 });
@@ -62,7 +62,6 @@ app.use("/api", api);
   try {
     await db.dbInit();
     for (let table of dbTables) {
-      console.log(`Creating table ${table.name}`);
       await db.dbCreateTable(table.name, table.columns, table.constraints);
     }
     global.logger.info("Database connection successful");

@@ -1,0 +1,1 @@
+# Dummy server to test register and login for a third party company

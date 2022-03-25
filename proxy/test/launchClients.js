@@ -1,87 +1,93 @@
 const { WebSocket } = require("ws");
 const uuidV4 = require("uuid").v4;
-const fs = require("fs");
-const _ = require("lodash");
-const crypto = require("crypto");
+const { argv } = require("process");
 
-const privateKey = fs.readFileSync("./assets/private.pem", "utf8");
 const generateMessageId = () => uuidV4();
 
-const SERVER = "ws://localhost:5000";
-const DEVICE_ID = "a659fff6-d94f-4457-bdf9-5d602aa554ec";
+const PROXY = "ws://localhost:5000";
 
-const encryptedPayload = (payload) => {
-  // if paylaod is an object, convert to string
-  if (typeof payload === "object") {
-    payload = JSON.stringify(payload);
-  }
-  return crypto.privateEncrypt(
-    {
-      key: privateKey,
-      passphrase: "bingo",
-    },
-    Buffer.from(payload.toString("base64"))
-  );
-};
-
-const launchClient = (id) => {
-  const ws = new WebSocket(SERVER);
-  ws.storage = {};
-  ws.on("open", function open() {
-    ws.on("message", function message(message) {
-      console.log(`ID ${id} received: ${message}`);
-      message = JSON.parse(message);
-      switch (message.type) {
-        case "distribute": {
-          const { id: userId, data } = message.data;
-          // rudimentary storage, in real version allow multiple
-          // ... pieces of data to be stored per user
-          ws.storage[userId] = data;
-          console.log(`ID ${userId} stored: ${data}`);
-          break;
-        }
-        case "retrieve": {
-          const { query, retrievalId } = message.data;
-          // In real version we can utilize more complex queries
-          // ... for this version just use basic pKey
-          const payload = ws.storage[query.id];
-          if (payload) {
-            console.log(`ID ${id} retrieved: ${payload}`);
-            ws.send(
-              JSON.stringify({
-                messageId: generateMessageId(),
-                type: "retrieved",
-                data: {
-                  payload: encryptedPayload(payload),
-                  retrievalId,
-                  id,
-                },
-              })
-            );
+const launchClient = () => {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(PROXY);
+    ws.storage = {};
+    ws.actions = {};
+    ws.addAction = (type, cb) => {
+      const id = uuidV4();
+      ws.actions[id] = {
+        type,
+        cb,
+        completed: false,
+      };
+      return id;
+    };
+    ws.on("open", function open() {
+      ws.on("message", function message(message) {
+        message = JSON.parse(message);
+        switch (message.type) {
+          case "id": {
+            ws._id = message._id;
+            console.log(`Connected: ${ws._id}`);
+            break;
+          }
+          case "distribute": {
+            const { id, domain, data } = message.data;
+            // rudimentary storage, in real version allow multiple
+            // ... pieces of data to be stored per user
+            ws.storage[domain] = ws.storage[domain] || {};
+            ws.storage[domain][id] = data;
+            console.log(`ID ${id} of domain ${domain} stored: ${data}`);
+            break;
+          }
+          case "retrieve": {
+            const { query, retrievalId } = message.data;
+            const { id, domain } = query;
+            // In real version we can utilize more complex queries
+            // ... for this version just use basic pKey
+            if (ws.storage[domain] && ws.storage[domain][id]) {
+              const payload = ws.storage[domain][id];
+              console.log(`ID ${id} for domain ${domain} retrieved: ${payload}`);
+              ws.send(
+                JSON.stringify({
+                  messageId: generateMessageId(),
+                  type: "retrieved",
+                  data: {
+                    payload,
+                    retrievalId,
+                  },
+                })
+              );
+            }
+            break;
+          }
+          case "action-success": {
+            const { actionId } = message.data;
+            const action = ws.actions[actionId];
+            if (action) {
+              action.completed = true;
+              action.cb(message.data);
+            }
+            break;
+          }
+          case "action-error": {
+            const { actionId } = message.error;
+            const action = ws.actions[actionId];
+            if (action) {
+              action.completed = true;
+              action.cb(null, message.error);
+            }
+            break;
           }
         }
-      }
+      });
+      resolve(ws);
     });
-    console.log(`Connected: ${id}`);
-    ws.send(
-      JSON.stringify({
-        messageId: generateMessageId(),
-        type: "identify",
-        data: {
-          id,
-          payload: encryptedPayload({
-            deviceId: DEVICE_ID,
-          }),
-        },
-      })
-    );
   });
 };
 
-module.exports = (userIds) => {
+module.exports = async (count = argv[2] || 1) => {
   let clients = [];
-  for (let i = 0; i < userIds.length; i++) {
-    clients.push(launchClient(userIds[i]));
+  for (let i = 0; i < count; i++) {
+    clients.push(await launchClient());
   }
   return clients;
 };

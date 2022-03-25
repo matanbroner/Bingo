@@ -3,7 +3,6 @@ const uuidV4 = require("uuid").v4;
 const superagent = require("superagent");
 const _ = require("lodash");
 const db = require("db");
-const MemoryCache = require("./cache").memory;
 const RetrievalJob = require("./jobs").retrieval;
 const mmh3 = require("../crypto").mmh3;
 const vss = require("../vss");
@@ -20,6 +19,23 @@ const send = (ws, message) => {
       messageId: generateMessageId(),
     })
   );
+};
+
+const promiseRetrievalJob = (retrievalId, query, threshold) => {
+  return new Promise((resolve, reject) => {
+    retrievalJobs[retrievalId] = new RetrievalJob(
+      retrievalId,
+      query,
+      threshold,
+      (data, err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(data);
+        }
+      }
+    );
+  });
 };
 
 const fetchDomain = async (domain) => {
@@ -47,7 +63,7 @@ const fetchDomain = async (domain) => {
 const registerApi = async (payload) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const { domainObj } = await fetchDomain(payload.domain);
+      const domainObj = await fetchDomain(payload.domain);
       const url = `${domainObj.baseApiUrl}/${domainObj.registerRoute}`;
       const secret = payload.requestBody[domainObj.secretKey];
       let id = payload.requestBody[domainObj.idKey];
@@ -78,7 +94,10 @@ const loginApi = async (payload, domainObj, secret) => {
         .post(url)
         .send({
           ...payload.requestBody,
-          [domainObj.secretKey]: secret,
+          [domainObj.secretKey]: {
+            given: payload.requestBody[domainObj.secretKey],
+            expected: secret,
+          },
         })
         .set("Content-Type", "application/json");
       if (res.status !== 200) {
@@ -122,7 +141,7 @@ const distribute = (items) => {
   if (!wss) {
     throw new Error("WSS not initialized");
   }
-  const activeSockets = wss.cache.active();
+  const activeSockets = wss.activeSockets();
   if (activeSockets.length === 0) {
     throw new Error("No active peers");
   }
@@ -143,9 +162,9 @@ const distribute = (items) => {
     () => items
   ).flat();
   // give each peer one item
-  for (let [_, peer] of randomPeers) {
+  for (let [_, ws] of randomPeers) {
     const item = items.pop();
-    send(peer.ws, {
+    send(ws, {
       type: "distribute",
       data: item,
     });
@@ -153,26 +172,25 @@ const distribute = (items) => {
   // TODO: send items to replication servers
 };
 
-const retrieve = (query, cb) => {
+const retrieve = async (query) => {
   if (!wss) {
-    cb(null, new Error("WSS not initialized"));
+    return Promise.reject(new Error("WSS not initialized"));
   }
-  const activeSockets = wss.cache.active();
+  const activeSockets = wss.activeSockets();
   if (activeSockets.length === 0) {
-    cb(null, new Error("No active peers"));
+    return Promise.reject(new Error("No active peers"));
   }
   const retrievalId = uuidV4();
-  retrievalJobs[retrievalId] = new RetrievalJob(
+  let retrievalJob = promiseRetrievalJob(
     retrievalId,
     query,
-    parseInt(process.env.THRESHOLD),
-    cb
+    parseInt(process.env.THRESHOLD)
   );
   // TODO: make the retieve mechanism more efficient
   // ... once we have a better distribution mechanism we can query only specific peers
   // ... for now we query all peers
-  for (let [_, peer] of activeSockets) {
-    send(peer.ws, {
+  for (let [_, ws] of activeSockets) {
+    send(ws, {
       type: "retrieve",
       data: {
         query,
@@ -180,11 +198,13 @@ const retrieve = (query, cb) => {
       },
     });
   }
+  return retrievalJob;
 };
 
 const acceptRetrievedData = async (wss, ws, json) => {
   const { messageId, data } = json;
-  const { id, retrievalId, payload } = data;
+  const { retrievalId, payload } = data;
+  global.logger.debug(`Received retrieved data for retrieval ${retrievalId}`);
   try {
     if (!retrievalId) {
       global.logger.error(`Invalid retrievalId: ${retrievalId}`);
@@ -197,7 +217,7 @@ const acceptRetrievedData = async (wss, ws, json) => {
     }
     // TODO: check for dataType being retrieved
     if (job.active) {
-      job.push(decoded);
+      job.push(payload);
       global.logger.debug(`Retrieved data pushed to job: ${retrievalId}`);
     }
   } catch (e) {
@@ -224,38 +244,35 @@ const action = async (wss, ws, json) => {
         distribute(shares);
         send(ws, {
           replyId: messageId,
-          type: "success",
+          type: "action-success",
           data: {
             actionId,
           },
         });
+        break;
       }
       case "login": {
         const domainObj = await fetchDomain(payload.domain);
         const { idKey } = domainObj;
-        const id = payload.requestBody[idKey];
+        let id = payload.requestBody[idKey];
         if (!id) {
           throw new Error("Invalid request body");
         }
-        retrieve(
-          {
-            [idKey]: id,
+        id = await mmh3(id);
+        const secret = await retrieve({
+          id,
+          domain: domainObj.id,
+        });
+        const [apiKey] = await loginApi(payload, domainObj, secret);
+        send(ws, {
+          replyId: messageId,
+          type: "action-success",
+          data: {
+            actionId,
+            apiKey,
           },
-          async (secret) => {
-            if (!secret) {
-              throw new Error("Invalid secret retrieved");
-            }
-            const apiKey = await loginApi(payload, domainObj, secret);
-            send(ws, {
-              replyId: messageId,
-              type: "success",
-              data: {
-                actionId,
-                apiKey,
-              },
-            });
-          }
-        );
+        });
+        break;
       }
       default:
         throw new Error("Invalid action");
@@ -263,7 +280,7 @@ const action = async (wss, ws, json) => {
   } catch (e) {
     send(ws, {
       replyId: messageId,
-      type: "error",
+      type: "action-error",
       error: {
         message: e.message,
         actionId,
@@ -279,21 +296,19 @@ module.exports = {
     wss = new WSS({
       server,
     });
-    wss.cache = (function () {
-      switch (process.env.MODE) {
-        // allow for different production modes to use different cache
-        default:
-          return new MemoryCache();
-      }
-    })();
+
+    wss._active = {};
+    wss.activeSockets = () => Object.entries(wss._active);
 
     wss.on("connection", (ws) => {
       // Assign a unique ID to the client
       ws._id = uuidV4();
       send(ws, {
         type: "id",
-        id: ws._id,
+        _id: ws._id,
       });
+
+      wss._active[ws._id] = ws;
 
       ws.on("message", (message) => {
         const data = JSON.parse(message);
@@ -307,6 +322,7 @@ module.exports = {
             break;
           case "action":
             action(wss, ws, data);
+            break;
           case "retrieved":
             acceptRetrievedData(wss, ws, data);
           default:
@@ -318,12 +334,7 @@ module.exports = {
         // TODO: should the user be purged from cache?
         // ... by making the user inactive we prevent the need for another 4-way handshake
         global.logger.info(`Client ${ws._id} disconnected`);
-        // find the client in the cache
-        if (!ws._userId) {
-          return;
-        } else {
-          wss.cache.get(ws._userId).active = false;
-        }
+        delete wss._active[ws._id];
       });
     });
   },

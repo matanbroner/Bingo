@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const murmurhash3 = require("murmurhash3");
 
-const seed = parseInt(process.env.MMH3_SEED);
+const seed = parseInt(process.env.SEED);
 
 const sha256 = (data) => {
   return crypto.createHash("sha256").update(data).digest("hex");
