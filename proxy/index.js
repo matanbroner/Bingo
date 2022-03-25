@@ -61,16 +61,15 @@ app.use("/api", api);
 (async () => {
   try {
     await db.dbInit();
-    await Promise.all(
-      dbTables.map((table) =>
-        db.dbCreateTable(table.name, table.columns, table.constraints)
-      )
-    );
+    for (let table of dbTables) {
+      console.log(`Creating table ${table.name}`);
+      await db.dbCreateTable(table.name, table.columns, table.constraints);
+    }
     global.logger.info("Database connection successful");
     server.listen(process.env.PORT, () => {
-      global.logger.info(`Server listening on port ${process.env.PORT}`);
+      global.logger.info(`Proxy server listening on port ${process.env.PORT}`);
     });
   } catch (err) {
-    global.logger.error(`Server startup failed: ${err}`);
+    global.logger.error(`Proxy server startup failed: ${err}`);
   }
 })();

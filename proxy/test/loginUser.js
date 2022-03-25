@@ -8,7 +8,7 @@ const publicKey = fs.readFileSync(
   path.join(__dirname, "./assets/public.pem"),
   "utf8"
 );
-const email = "4d0649b2-a83c-4ac4-805c-96235c9aa649@bingo.com";
+const email = "6c491064-8a75-4e50-a2dd-e86eb300a4fa@bingo.com";
 const password = "Bingo123!";
 
 const loginUser = async (email, password, publicKey) => {

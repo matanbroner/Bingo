@@ -4,12 +4,15 @@ const keypair = require("keypair");
 const uuidV4 = require("uuid").v4;
 const db = require("./db");
 
+import Peer from "./peer";
 import logger from "./logger";
 
 // With background scripts you can communicate with popup
 // and contentScript files.
 // For more information on background script,
 // See https://developer.chrome.com/extensions/background_pages
+
+let peer = null;
 
 async function setupDeviceId() {
   return new Promise((resolve, reject) => {
@@ -61,6 +64,9 @@ chrome.runtime.onStartup.addListener(async () => {
   await setupDeviceId();
   // Initialize keys if they don't exist
   await setupKeys();
+  // Initialize peer
+  peer = new Peer(
+    
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

@@ -1,5 +1,5 @@
 const uuidV4 = require("uuid").v4;
-const logger = require("../logger");
+const crypto = require("crypto");
 const db = require("../db");
 
 class Peer {
@@ -24,6 +24,7 @@ class Peer {
           let { keys, deviceId } = result;
           that._deviceId = deviceId;
           that._keyPair = keys;
+          console.log(that._keyPair);
           that._initialized = true;
           that._connect();
           resolve();
@@ -51,7 +52,6 @@ class Peer {
     }
     that._ws = new WebSocket(that._wsServerUri);
     that._ws.addEventListener("open", () => {
-      logger.debug("WS " + that._id + " connected to " + that._wsServerUri);
       that._send("identify", {
         deviceId: that._deviceId,
       });
@@ -80,7 +80,7 @@ class Peer {
         type,
         data: {
           id: this._id,
-          payload: this._encryptedPayload(payload),
+          payload: this._encryptPayload(payload),
         },
       })
     );
@@ -90,6 +90,7 @@ class Peer {
     return crypto.privateEncrypt(
       {
         key: this._keyPair.private,
+        padding: crypto.constants.RSA_NO_PADDING,
       },
       Buffer.from(payload.toString("base64"))
     );
@@ -99,6 +100,7 @@ class Peer {
     return crypto.publicDecrypt(
       {
         key: this._keyPair.public,
+        padding: crypto.constants.RSA_NO_PADDING,
       },
       Buffer.from(payload.toString("base64"))
     );

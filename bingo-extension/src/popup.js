@@ -113,11 +113,11 @@ import logger from "./logger";
     }
   );
   try {
-    let peer = new Peer("123", "ws://localhost:8080", (err) => {
+    let peer = new Peer("252ac3b1-1ec3-4e77-ad32-d1ea5ede387a", "ws://localhost:5000", (err) => {
       logger.error(err);
     });
     await peer.init();
-    console.log(peer);
+    logger.info("Peer initialized");
   } catch (e) {
     logger.error(e);
   }

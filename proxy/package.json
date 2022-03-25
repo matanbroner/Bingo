@@ -18,6 +18,7 @@
     "geoip-lite": "^1.4.3",
     "lodash": "^4.17.21",
     "logger": "file:../tools/logger",
+    "murmurhash3": "^0.5.0",
     "secrets.js-grempe": "^2.0.0",
     "sqlite3": "^5.0.2",
     "superagent": "^7.1.1",

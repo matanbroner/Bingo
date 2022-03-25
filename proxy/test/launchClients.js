@@ -10,20 +10,19 @@ const generateMessageId = () => uuidV4();
 const SERVER = "ws://localhost:5000";
 const DEVICE_ID = "a659fff6-d94f-4457-bdf9-5d602aa554ec";
 
-const encryptedPayload = (payload) =>
-  {
-    // if paylaod is an object, convert to string
-    if (typeof payload === "object") {
-      payload = JSON.stringify(payload);
-    }
-    return crypto.privateEncrypt(
-      {
-        key: privateKey,
-        passphrase: "bingo",
-      },
-      Buffer.from(payload.toString("base64"))
-    );
+const encryptedPayload = (payload) => {
+  // if paylaod is an object, convert to string
+  if (typeof payload === "object") {
+    payload = JSON.stringify(payload);
   }
+  return crypto.privateEncrypt(
+    {
+      key: privateKey,
+      passphrase: "bingo",
+    },
+    Buffer.from(payload.toString("base64"))
+  );
+};
 
 const launchClient = (id) => {
   const ws = new WebSocket(SERVER);
