@@ -201,6 +201,7 @@ const retrieve = async (query) => {
   return retrievalJob;
 };
 
+
 const acceptRetrievedData = async (wss, ws, json) => {
   const { messageId, data } = json;
   const { retrievalId, payload } = data;
@@ -244,7 +245,7 @@ const action = async (wss, ws, json) => {
         distribute(shares);
         send(ws, {
           replyId: messageId,
-          type: "action-success",
+          type: "action-update",
           data: {
             actionId,
           },
@@ -266,7 +267,7 @@ const action = async (wss, ws, json) => {
         const [apiKey] = await loginApi(payload, domainObj, secret);
         send(ws, {
           replyId: messageId,
-          type: "action-success",
+          type: "action-update",
           data: {
             actionId,
             apiKey,
@@ -280,7 +281,7 @@ const action = async (wss, ws, json) => {
   } catch (e) {
     send(ws, {
       replyId: messageId,
-      type: "action-error",
+      type: "action-update",
       error: {
         message: e.message,
         actionId,
@@ -305,7 +306,9 @@ module.exports = {
       ws._id = uuidV4();
       send(ws, {
         type: "id",
-        _id: ws._id,
+        data: {
+          id: ws._id,
+        },
       });
 
       wss._active[ws._id] = ws;
@@ -325,6 +328,7 @@ module.exports = {
             break;
           case "retrieved":
             acceptRetrievedData(wss, ws, data);
+            break;
           default:
             break;
         }

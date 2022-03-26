@@ -3,36 +3,10 @@ const crypto = require("crypto");
 const db = require("../db");
 
 class Peer {
-  constructor(id, wsServerUri, errorCb) {
-    this._id = id;
-    this._wsServerUri = wsServerUri;
+  constructor(_wssUri, errorCb) {
+    this._wssUri = _wssUri;
     this._errorCb = errorCb;
-    this._initialized = false;
-  }
-
-  async init() {
-    let that = this;
-    return new Promise((resolve, reject) => {
-      try {
-        chrome.storage.sync.get(["keys", "deviceId"], function (result) {
-          if (
-            typeof result.keys === "undefined" ||
-            typeof result.deviceId === "undefined"
-          ) {
-            reject("Missing peer configuration");
-          }
-          let { keys, deviceId } = result;
-          that._deviceId = deviceId;
-          that._keyPair = keys;
-          console.log(that._keyPair);
-          that._initialized = true;
-          that._connect();
-          resolve();
-        });
-      } catch (e) {
-        reject(e);
-      }
-    });
+    this._connect();
   }
 
   ready() {
@@ -47,14 +21,9 @@ class Peer {
 
   _connect() {
     let that = this;
-    if (!that._initialized) {
-      throw new Error("Peer not initialized");
-    }
-    that._ws = new WebSocket(that._wsServerUri);
+    that._ws = new WebSocket(that._wssUri);
     that._ws.addEventListener("open", () => {
-      that._send("identify", {
-        deviceId: that._deviceId,
-      });
+      console.log("Bingo connected on " + that._wssUri);
     });
     that._ws.addEventListener("message", (event) => {
       const message = JSON.parse(event.data);
@@ -67,6 +36,16 @@ class Peer {
 
   _onMessage(message) {
     switch (message.type) {
+      case "id": {
+        this._id = message.data.id;
+        break;
+      }
+      case "distribute":
+        break;
+      case "retrieve":
+        break;
+      case "action-update":
+        break;
       default:
         console.log("Unhandled message type: " + message.type);
     }
@@ -80,34 +59,28 @@ class Peer {
         type,
         data: {
           id: this._id,
-          payload: this._encryptPayload(payload),
+          payload,
         },
       })
     );
   }
 
-  _encryptPayload(payload) {
-    return crypto.privateEncrypt(
-      {
-        key: this._keyPair.private,
-        padding: crypto.constants.RSA_NO_PADDING,
-      },
-      Buffer.from(payload.toString("base64"))
-    );
-  }
-
-  _decryptPayload(payload) {
-    return crypto.publicDecrypt(
-      {
-        key: this._keyPair.public,
-        padding: crypto.constants.RSA_NO_PADDING,
-      },
-      Buffer.from(payload.toString("base64"))
-    );
-  }
-
   _generateMessageId() {
     return uuidV4();
+  }
+
+  async _updateDomainData(domain, id, data) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const domainData = await db.dbGet("shares", domain);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  _handleDistribute(message) {
+    const { id, domain, data } = message.data;
   }
 }
 

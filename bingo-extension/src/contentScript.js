@@ -1,7 +1,12 @@
 "use strict";
 
 import logger from "./logger";
+import Peer from "./peer";
 
+const db = require("./db");
+const config = require("./assets/config");
+
+let peer = null;
 
 // Content script file will run in the context of web page.
 // With content script you can manipulate the web pages using
@@ -14,23 +19,26 @@ import logger from "./logger";
 // For more information on Content Scripts,
 // See https://developer.chrome.com/extensions/content_scripts
 
+window.addEventListener("message", async function (event) {
+  // We only accept messages from ourselves
+  if (event.source != window) return;
+
+  if (event.data.type && event.data.type == "BINGO_MARCO") {
+    window.postMessage({ type: "BINGO_POLO" }, "*");
+    db.dbInit("shares", "id");
+    peer = new Peer(config.WSS_URI, (error) => {
+      logger.error(error);
+    });
+  }
+  const test = await db.dbGet("shares", "test");
+  console.log(test);
+});
+
 // Log `title` of current active web page
+
 const pageTitle = document.head.getElementsByTagName("title")[0].innerHTML;
 console.log(
   `Page title is: '${pageTitle}' - evaluated by Chrome extension's 'contentScript.js' file`
-);
-
-// Communicate with background file by sending a message
-chrome.runtime.sendMessage(
-  {
-    type: "GREETINGS",
-    payload: {
-      message: "Hello, my name is Con. I am from ContentScript.",
-    },
-  },
-  (response) => {
-    console.log(response.message);
-  }
 );
 
 // Listen for message

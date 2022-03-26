@@ -1,38 +1,50 @@
 const config = require("../assets/config");
+import Dexie from "dexie"
 import logger from "../logger";
 
 let db = null;
 
-function dbInit(table, keyPath) {
-  const request = window.indexedDB.open(config.DB_NAME);
+async function dbInit(table, keyPath) {
+  try {
+    await openDB(config.DB_NAME, undefined, )
+  } catch (e) {
+    logger.error(e);
+  }
+  return new Promise((resolve, reject) => {
+    if (db) {
+      return;
+    }
+    const request = window.indexedDB.open(config.DB_NAME);
 
-  request.onerror = function (event) {
-    logger.error(`Error opening DB: ${event.message}`);
-  };
-
-  request.onupgradeneeded = function (event) {
-    db = event.target.result;
-
-    let objectStore = db.createObjectStore(table, {
-      keyPath,
-    });
-
-    objectStore.transaction.oncomplete = function (event) {
-      logger.info(`Created object store ${table}`);
-    };
-  };
-
-  request.onsuccess = function (event) {
-    db = event.target.result;
-    logger.info(`Successfully opened DB ${config.DB_NAME}`);
-
-    db.onerror = function (event) {
+    request.onerror = function (event) {
       logger.error(`Error opening DB: ${event.message}`);
+      reject(`Error opening DB: ${event.message}`);
     };
-  };
+
+    request.onupgradeneeded = function (event) {
+      db = event.target.result;
+
+      let objectStore = db.createObjectStore(table, {
+        keyPath,
+      });
+
+      objectStore.transaction.oncomplete = function (event) {
+        logger.info(`Created object store ${table}`);
+      };
+    };
+
+    request.onsuccess = function (event) {
+      db = event.target.result;
+      logger.info(`Successfully opened DB ${config.DB_NAME}`);
+
+      db.onerror = function (event) {
+        logger.error(`Error opening DB: ${event.message}`);
+      };
+    };
+  });
 }
 
-async function dbInsert(table, data) {
+async function dbInsert(table, key, data) {
   return new Promise((resolve, reject) => {
     if (!db) {
       reject("DB not initialized");
@@ -40,7 +52,7 @@ async function dbInsert(table, data) {
     }
     const transaction = db.transaction(table, "readwrite");
     const objectStore = transaction.objectStore(table);
-    const request = objectStore.add(data);
+    const request = objectStore.add(data, key);
 
     request.onerror = function (event) {
       reject(`Error inserting data: ${event.message}`);
