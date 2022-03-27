@@ -1,11 +1,11 @@
 "use strict";
 
-const keypair = require("keypair");
-const uuidV4 = require("uuid").v4;
-const db = require("./db");
+const config = require("./assets/config");
 
 import Peer from "./peer";
 import logger from "./logger";
+
+let peer = null;
 
 // With background scripts you can communicate with popup
 // and contentScript files.
@@ -14,22 +14,42 @@ import logger from "./logger";
 
 // Only runs once when the browser starts
 chrome.runtime.onStartup.addListener(async () => {
-  // Initialize database
-  db.dbInit("shares", "id");
+  peer = new Peer(config.WSS_URI, (error) => {
+    logger.error(error);
+  });
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  logger.info("Got message: " + request);
-  if (request.type === "GREETINGS") {
-    const message = `Hi ${
-      sender.tab ? "Con" : "Pop"
-    }, my name is Back. I am from Background. It's great to hear from you.`;
-
-    // Log message coming from the `request` parameter
-    console.log(request.payload.message);
-    // Send a response message
-    sendResponse({
-      message,
+  if (request.type === "LOGIN") {
+    peer.addAction("login", request.payload, request.domain, (data, err) => {
+      if (error) {
+        sendResponse({
+          type: "ERROR",
+          error,
+        });
+      } else {
+        sendResponse({
+          type: "SUCCESS",
+          data: data,
+        });
+      }
     });
+    return true;
+  }
+  if (request.type === "REGISTER") {
+    peer.addAction("register", request.payload, request.domain, (data, err) => {
+      if (error) {
+        sendResponse({
+          type: "ERROR",
+          error,
+        });
+      } else {
+        sendResponse({
+          type: "OK",
+          data: data,
+        });
+      }
+    });
+    return true;
   }
 });

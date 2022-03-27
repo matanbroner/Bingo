@@ -201,7 +201,6 @@ const retrieve = async (query) => {
   return retrievalJob;
 };
 
-
 const acceptRetrievedData = async (wss, ws, json) => {
   const { messageId, data } = json;
   const { retrievalId, payload } = data;
@@ -234,10 +233,9 @@ const acceptRetrievedData = async (wss, ws, json) => {
 const action = async (wss, ws, json) => {
   const { messageId, data } = json;
   const { actionId, payload } = data;
+
   try {
-    if (!actionId) {
-      throw new Error("Invalid jobId");
-    }
+    global.logger.debug(`Received action ${actionId}`);
     switch (payload.action) {
       case "register": {
         const [domainObj, secret, id] = await registerApi(payload);

@@ -1,6 +1,5 @@
 const uuidV4 = require("uuid").v4;
 const crypto = require("crypto");
-const db = require("../db");
 
 class Peer {
   constructor(_wssUri, errorCb) {
@@ -19,11 +18,34 @@ class Peer {
     }
   }
 
+  addAction(type, requestBody, domain, cb) {
+    const actionId = this._ws.addAction(type, cb);
+    console.log("Sending action: " + actionId);
+    this._send("action", {
+      actionId,
+      payload: {
+        action: type,
+        requestBody,
+        domain,
+      },
+    })
+  }
+
   _connect() {
     let that = this;
     that._ws = new WebSocket(that._wssUri);
     that._ws.addEventListener("open", () => {
       console.log("Bingo connected on " + that._wssUri);
+      that._ws.actions = {};
+      that._ws.addAction = (type, cb) => {
+        const id = uuidV4();
+        that._ws.actions[id] = {
+          type,
+          cb,
+          completed: false,
+        };
+        return id;
+      };
     });
     that._ws.addEventListener("message", (event) => {
       const message = JSON.parse(event.data);
@@ -41,26 +63,37 @@ class Peer {
         break;
       }
       case "distribute":
+        this._handleDistribute(message);
         break;
       case "retrieve":
+        this._handleRetrieve(message);
         break;
-      case "action-update":
+      case "action-update": {
+        const actionId = message.data ? message.data.actionId : message.error.actionId;
+        const action = this._ws.actions[actionId];
+        if (action) {
+          console.log("Action update: " + actionId);
+          action.completed = true;
+          if (action.data) {
+            action.cb(action.data);
+          } else if (action.error) {
+            action.cb(null, action.error);
+          }
+        }
         break;
+      }
       default:
         console.log("Unhandled message type: " + message.type);
     }
   }
 
-  _send(type, payload, replyId = null) {
+  _send(type, data, replyId = null) {
     this._ws.send(
       JSON.stringify({
         messageId: this._generateMessageId(),
         replyId,
         type,
-        data: {
-          id: this._id,
-          payload,
-        },
+        data,
       })
     );
   }
@@ -69,18 +102,45 @@ class Peer {
     return uuidV4();
   }
 
-  async _updateDomainData(domain, id, data) {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const domainData = await db.dbGet("shares", domain);
-      } catch (err) {
-        reject(err);
+  _handleRetrieve(message) {
+    const { query, retrievalId } = message.data;
+    chrome.runtime.sendMessage(
+      {
+        type: "DATA_RETRIEVE",
+        table: "shares",
+        payload: query,
+      },
+      function (response) {
+        if (response.type === "SUCCESS") {
+          const { data } = response;
+          that._send("retrieved", { retrievalId, payload: data });
+        } else {
+          // TODO: send error to wss, for now log
+          console.log("Failed to retrieve data: " + response.error.message);
+        }
       }
-    });
+    );
   }
 
   _handleDistribute(message) {
     const { id, domain, data } = message.data;
+    chrome.runtime.sendMessage(
+      {
+        type: "DATA_STORE",
+        table: "shares",
+        data: {
+          id,
+          domain,
+          data,
+        },
+      },
+      (response) => {
+        if (response.type !== "SUCCESS") {
+          // TODO: send error to wss, for now log
+          console.log("Failed to store share data: " + response.error.message);
+        }
+      }
+    );
   }
 }
 

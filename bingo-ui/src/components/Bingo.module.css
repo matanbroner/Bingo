@@ -1,0 +1,46 @@
+#wrapper {
+    box-shadow: rgba(0, 0, 0, 0.25) 0px 14px 28px, rgba(0, 0, 0, 0.22) 0px 10px 10px;
+    background-color: whitesmoke;
+    padding: 50px;
+    border-radius: 5px;
+}
+
+#titleWrapper {
+    margin-bottom: 30px;
+}
+
+#titleSub {
+    color: #535456;
+}
+
+.input {
+    background-color: #E5E8EC;
+    width: 100%;
+    border-radius: 0px;
+    border: none;
+    padding: 10px;
+    text-align: center;
+    min-width: 250px;
+}
+
+.input:focus {
+    outline: none;
+    background-color: #E5E8EC;
+    color: #535456;
+}
+
+#submitBtn{
+    background-color: #890F0D;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 25px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 30px;
+}
+
+#submitBtn:hover{
+    background-color: #8c302f;
+    transition: all 0.1s ease;
+}   

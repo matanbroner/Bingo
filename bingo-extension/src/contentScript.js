@@ -1,12 +1,9 @@
 "use strict";
 
 import logger from "./logger";
-import Peer from "./peer";
 
-const db = require("./db");
+const { dbInit } = require("./db");
 const config = require("./assets/config");
-
-let peer = null;
 
 // Content script file will run in the context of web page.
 // With content script you can manipulate the web pages using
@@ -19,30 +16,87 @@ let peer = null;
 // For more information on Content Scripts,
 // See https://developer.chrome.com/extensions/content_scripts
 
+function injectHiddenTag() {
+  var div = document.createElement("div");
+  div.setAttribute("id", "bingo-installed");
+  div.style.visibility = "hidden";
+  document.body.appendChild(div);
+}
+
+injectHiddenTag();
+
+const db = dbInit();
+
 window.addEventListener("message", async function (event) {
   // We only accept messages from ourselves
-  if (event.source != window) return;
+  if (event.source != window || !event.data.type) return;
 
-  if (event.data.type && event.data.type == "BINGO_MARCO") {
+  if (event.data.type == "BINGO_MARCO") {
     window.postMessage({ type: "BINGO_POLO" }, "*");
-    db.dbInit("shares", "id");
-    peer = new Peer(config.WSS_URI, (error) => {
-      logger.error(error);
-    });
   }
-  const test = await db.dbGet("shares", "test");
-  console.log(test);
+  if (event.data.type == "LOGIN") {
+    chrome.runtime.sendMessage(
+      { type: "LOGIN", payload: event.data.payload },
+      function (response) {
+        if (response.type == "SUCCESS") {
+          console.log("Login response: " + JSON.stringify(response.data));
+          window.postMessage(
+            { type: "LOGIN_SUCCESS", payload: response.data },
+            "*"
+          );
+        } else {
+          window.postMessage(
+            { type: "LOGIN_ERROR", error: response.error },
+            "*"
+          );
+        }
+      }
+    );
+  }
+  if (event.data.type == "REGISTER") {
+    chrome.runtime.sendMessage(
+      { type: "REGISTER", payload: event.data.payload },
+      function (response) {
+        if (response.type == "OK") {
+          console.log("Register response: " + JSON.stringify(response.data));
+          window.postMessage(
+            { type: "REGISTER_SUCCESS", payload: response.data },
+            "*"
+          );
+        } else {
+          window.postMessage(
+            { type: "REGISTER_ERROR", error: response.error },
+            "*"
+          );
+        }
+      }
+    );
+  }
 });
 
-// Log `title` of current active web page
-
-const pageTitle = document.head.getElementsByTagName("title")[0].innerHTML;
-console.log(
-  `Page title is: '${pageTitle}' - evaluated by Chrome extension's 'contentScript.js' file`
-);
+let domain = new URL(window.location.href).hostname;
+domain = domain.replace("www.", "");
 
 // Listen for message
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
+  if (request.type === "DATA_STORE") {
+    try {
+      await db[request.table].put(request.payload);
+      sendResponse({ type: "SUCCESS" });
+    } catch (e) {
+      logger.error(e);
+      sendResponse({ type: "ERROR", error: e });
+    }
+  }
+  if (request.type === "DATA_RETRIEVE") {
+    try {
+      const data = await db[request.table].where(request.payload).first();
+      sendResponse({ type: "SUCCESS", data });
+    } catch (e) {
+      logger.error(e);
+      sendResponse({ type: "ERROR", error: e });
+    }
+  }
   // Send an empty response
   // See https://github.com/mozilla/webextension-polyfill/issues/130#issuecomment-531531890
   sendResponse({});
