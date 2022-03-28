@@ -1,6 +1,8 @@
 const uuidV4 = require("uuid").v4;
 const crypto = require("crypto");
 
+const RECONNECT_TIMEOUT = 5000;
+
 class Peer {
   constructor(_wssUri, errorCb) {
     this._wssUri = _wssUri;
@@ -28,7 +30,7 @@ class Peer {
         requestBody,
         domain,
       },
-    })
+    });
   }
 
   _connect() {
@@ -54,6 +56,11 @@ class Peer {
     that._ws.addEventListener("error", (event) => {
       that._errorCb(JSON.stringify(event));
     });
+    that._ws.addEventListener("close", (event) => {
+      setTimeout(() => {
+        that._connect();
+      }, RECONNECT_TIMEOUT);
+    });
   }
 
   _onMessage(message) {
@@ -69,15 +76,17 @@ class Peer {
         this._handleRetrieve(message);
         break;
       case "action-update": {
-        const actionId = message.data ? message.data.actionId : message.error.actionId;
+        const actionId = message.data
+          ? message.data.actionId
+          : message.error.actionId;
         const action = this._ws.actions[actionId];
         if (action) {
           console.log("Action update: " + actionId);
           action.completed = true;
-          if (action.data) {
-            action.cb(action.data);
-          } else if (action.error) {
-            action.cb(null, action.error);
+          if (message.data) {
+            action.cb(message.data);
+          } else if (message.error) {
+            action.cb(null, message.error);
           }
         }
         break;

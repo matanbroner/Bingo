@@ -23,6 +23,10 @@ function injectHiddenTag() {
   document.body.appendChild(div);
 }
 
+const windowDomain = () => {
+  return window.location.hostname;
+};
+
 injectHiddenTag();
 
 const db = dbInit();
@@ -36,10 +40,9 @@ window.addEventListener("message", async function (event) {
   }
   if (event.data.type == "LOGIN") {
     chrome.runtime.sendMessage(
-      { type: "LOGIN", payload: event.data.payload },
+      { type: "LOGIN", domain: windowDomain(), payload: event.data.payload },
       function (response) {
         if (response.type == "SUCCESS") {
-          console.log("Login response: " + JSON.stringify(response.data));
           window.postMessage(
             { type: "LOGIN_SUCCESS", payload: response.data },
             "*"
@@ -55,7 +58,7 @@ window.addEventListener("message", async function (event) {
   }
   if (event.data.type == "REGISTER") {
     chrome.runtime.sendMessage(
-      { type: "REGISTER", payload: event.data.payload },
+      { type: "REGISTER", domain: windowDomain(), payload: event.data.payload },
       function (response) {
         if (response.type == "OK") {
           console.log("Register response: " + JSON.stringify(response.data));

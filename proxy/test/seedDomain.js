@@ -38,7 +38,7 @@ const registerDomain = async (
 (async () => {
   await db.dbInit(path.join(__dirname, "../bingo_db"));
   const id = await registerDomain(
-    "bingo.com",
+    "localhost",
     "http://localhost:8080/api",
     "/login",
     "/register",

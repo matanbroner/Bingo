@@ -17,7 +17,6 @@ const userTable = {
   name: "users",
   columns: {
     id: "TEXT NOT NULL UNIQUE",
-    email: "TEXT NOT NULL UNIQUE",
     domainId: "TEXT NOT NULL",
   },
   constraints: [

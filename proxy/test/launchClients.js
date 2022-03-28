@@ -25,7 +25,7 @@ const launchClient = () => {
         message = JSON.parse(message);
         switch (message.type) {
           case "id": {
-            ws._id = message._id;
+            ws._id = message.data.id;
             console.log(`Connected: ${ws._id}`);
             break;
           }
@@ -59,21 +59,19 @@ const launchClient = () => {
             }
             break;
           }
-          case "action-success": {
-            const { actionId } = message.data;
+          case "action-update": {
+            const actionId = message.data
+              ? message.data.actionId
+              : message.error.actionId;
             const action = ws.actions[actionId];
             if (action) {
+              console.log("Action update: " + actionId);
               action.completed = true;
-              action.cb(message.data);
-            }
-            break;
-          }
-          case "action-error": {
-            const { actionId } = message.error;
-            const action = ws.actions[actionId];
-            if (action) {
-              action.completed = true;
-              action.cb(null, message.error);
+              if (message.data) {
+                action.cb(message.data);
+              } else if (message.error) {
+                action.cb(null, message.error);
+              }
             }
             break;
           }

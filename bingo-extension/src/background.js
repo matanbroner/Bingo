@@ -21,7 +21,7 @@ chrome.runtime.onStartup.addListener(async () => {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "LOGIN") {
-    peer.addAction("login", request.payload, request.domain, (data, err) => {
+    peer.addAction("login", request.payload, request.domain, (data, error) => {
       if (error) {
         sendResponse({
           type: "ERROR",
@@ -37,7 +37,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.type === "REGISTER") {
-    peer.addAction("register", request.payload, request.domain, (data, err) => {
+    peer.addAction("register", request.payload, request.domain, (data, error) => {
       if (error) {
         sendResponse({
           type: "ERROR",

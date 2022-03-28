@@ -42,14 +42,14 @@ const fetchDomain = async (domain) => {
   return new Promise(async (resolve, reject) => {
     try {
       if (!domain) {
-        throw new Error("Invalid domain");
+        throw new Error("Domain not provided");
       }
       const hashedDomain = await mmh3(domain);
       const domainObj = await db.dbQueryOne("domains", {
         id: hashedDomain,
       });
       if (!domainObj) {
-        throw new Error("Invalid domain");
+        throw new Error("Domain not registered or invalid");
       }
       // TODO: API base URI should be encrypted with proxy server public key
       // ... here we should decrypt it with the private key
@@ -137,13 +137,13 @@ const generateShares = async (secret, domainObj, id) => {
   });
 };
 
-const distribute = (items) => {
+const distribute = async (items) => {
   if (!wss) {
-    throw new Error("WSS not initialized");
+    return Promise.reject(new Error("WSS not initialized"));
   }
   const activeSockets = wss.activeSockets();
-  if (activeSockets.length === 0) {
-    throw new Error("No active peers");
+  if (activeSockets.length < items.length * process.env.REPLICATION_FACTOR) {
+    return Promise.reject(new Error("Not enough active peers"));
   }
   // TODO: improve distribution mechanism
   // ... currently we distribute to n random peers
@@ -170,6 +170,8 @@ const distribute = (items) => {
     });
   }
   // TODO: send items to replication servers
+
+  return Promise.resolve();
 };
 
 const retrieve = async (query) => {
@@ -177,7 +179,7 @@ const retrieve = async (query) => {
     return Promise.reject(new Error("WSS not initialized"));
   }
   const activeSockets = wss.activeSockets();
-  if (activeSockets.length === 0) {
+  if (activeSockets.length < process.env.THRESHOLD) {
     return Promise.reject(new Error("No active peers"));
   }
   const retrievalId = uuidV4();
@@ -240,7 +242,11 @@ const action = async (wss, ws, json) => {
       case "register": {
         const [domainObj, secret, id] = await registerApi(payload);
         const shares = await generateShares(secret, domainObj, id);
-        distribute(shares);
+        await distribute(shares);
+        await db.dbInsert("users", {
+          id,
+          domainId: domainObj.id,
+        });
         send(ws, {
           replyId: messageId,
           type: "action-update",
@@ -258,6 +264,13 @@ const action = async (wss, ws, json) => {
           throw new Error("Invalid request body");
         }
         id = await mmh3(id);
+        const bingoUser = await db.dbQueryOne("users", {
+          id,
+          domainId: domainObj.id,
+        });
+        if (!bingoUser) {
+          throw new Error("Invalid user requested");
+        }
         const secret = await retrieve({
           id,
           domain: domainObj.id,
@@ -274,7 +287,7 @@ const action = async (wss, ws, json) => {
         break;
       }
       default:
-        throw new Error("Invalid action");
+        throw new Error("Invalid action request");
     }
   } catch (e) {
     send(ws, {

@@ -124,8 +124,15 @@ const Bingo = (props) => {
   const onFormSubmit = (e) => {
     setLoading(true);
     e.preventDefault();
-    if (props.mode === "login") {
-      window.postMessage({ type: "LOGIN", payload: values }, "*");
+    switch (props.mode) {
+      case "login":
+        window.postMessage({ type: "LOGIN", payload: values }, "*");
+        break;
+      case "register":
+        window.postMessage({ type: "REGISTER", payload: values }, "*");
+        break;
+      default:
+        break;
     }
   };
 
@@ -138,13 +145,21 @@ const Bingo = (props) => {
       setLoading(false);
     }
     if (event.data.type === "LOGIN_ERROR") {
-        toast("Login failed: " + event.data.error.message, {
-            type: "error",
-        });
-        setLoading(false);
+      toast("Login failed: " + event.data.error.message, {
+        type: "error",
+      });
+      setLoading(false);
     }
     if (event.data.type === "REGISTER_SUCCESS") {
-      console.log("Register ACK");
+      toast("Registration successful", {
+        type: "success",
+      });
+      setLoading(false);
+    }
+    if (event.data.type === "REGISTER_ERROR") {
+      toast("Registration failed: " + event.data.error.message, {
+        type: "error",
+      });
       setLoading(false);
     }
   };
