@@ -32,7 +32,7 @@ const loginUser = async (email, password) => {
               email,
               password,
             },
-            domain: "bingo.com",
+            domain: "localhost",
           },
         },
       })
@@ -42,7 +42,7 @@ const loginUser = async (email, password) => {
 
 (async () => {
   try {
-    const email = "1cf1ca95-cf34-473a-a564-6f60add2de65@bingo.com"
+    const email = "1c290333-9939-409b-97b3-0093328ff854@bingo.com"
     const [ws, response] = await loginUser(email, password);
     console.log(response);
     ws.close();

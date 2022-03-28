@@ -77,31 +77,34 @@ window.addEventListener("message", async function (event) {
   }
 });
 
-let domain = new URL(window.location.href).hostname;
-domain = domain.replace("www.", "");
 
 // Listen for message
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
   if (request.type === "DATA_STORE") {
-    try {
-      await db[request.table].put(request.payload);
-      sendResponse({ type: "SUCCESS" });
-    } catch (e) {
-      logger.error(e);
-      sendResponse({ type: "ERROR", error: e });
-    }
+    db[request.table]
+      .put(request.payload)
+      .then(() => {
+        sendResponse({ type: "SUCCESS" });
+      })
+      .catch((err) => {
+        sendResponse({ type: "ERROR", error: err });
+      });
   }
   if (request.type === "DATA_RETRIEVE") {
-    try {
-      const data = await db[request.table].where(request.payload).first();
-      sendResponse({ type: "SUCCESS", data });
-    } catch (e) {
-      logger.error(e);
-      sendResponse({ type: "ERROR", error: e });
-    }
+    db[request.table]
+      .where(request.payload)
+      .first()
+      .then((data) => {
+        if (data) {
+          sendResponse({ type: "SUCCESS", data });
+        } else {
+          throw new Error("Requested data not found");
+        }
+      })
+      .catch((err) => {
+        logger.error(e);
+        sendResponse({ type: "ERROR", error: e });
+      });
   }
-  // Send an empty response
-  // See https://github.com/mozilla/webextension-polyfill/issues/130#issuecomment-531531890
-  sendResponse({});
   return true;
 });

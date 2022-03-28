@@ -12,11 +12,32 @@ let peer = null;
 // For more information on background script,
 // See https://developer.chrome.com/extensions/background_pages
 
-// Only runs once when the browser starts
-chrome.runtime.onStartup.addListener(async () => {
-  peer = new Peer(config.WSS_URI, (error) => {
-    logger.error(error);
+async function getCurrentTab() {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.getSelected(null, function (tab) {
+      resolve(tab);
+    });
   });
+}
+
+const sendMessageToActiveTab = async (message, cb) => {
+  try {
+    let tab = await getCurrentTab();
+    chrome.tabs.sendMessage(tab.id, message, null, cb);
+  } catch (error) {
+    logger.error(error);
+    cb({
+      type: "ERROR",
+      error: {
+        message: error.message,
+      },
+    });
+  }
+};
+
+// Only runs once when the browser starts
+peer = new Peer(config.WSS_URI, sendMessageToActiveTab, (error) => {
+  logger.error(error);
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -37,19 +58,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   if (request.type === "REGISTER") {
-    peer.addAction("register", request.payload, request.domain, (data, error) => {
-      if (error) {
-        sendResponse({
-          type: "ERROR",
-          error,
-        });
-      } else {
-        sendResponse({
-          type: "OK",
-          data: data,
-        });
+    peer.addAction(
+      "register",
+      request.payload,
+      request.domain,
+      (data, error) => {
+        if (error) {
+          sendResponse({
+            type: "ERROR",
+            error,
+          });
+        } else {
+          sendResponse({
+            type: "OK",
+            data: data,
+          });
+        }
       }
-    });
+    );
     return true;
   }
 });

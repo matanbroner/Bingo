@@ -35,7 +35,7 @@ const registerUser = async (email, password) => {
               email,
               password,
             },
-            domain: "bingo.com",
+            domain: "localhost",
           },
         },
       })

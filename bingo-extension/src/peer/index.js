@@ -4,9 +4,10 @@ const crypto = require("crypto");
 const RECONNECT_TIMEOUT = 5000;
 
 class Peer {
-  constructor(_wssUri, errorCb) {
+  constructor(_wssUri, sendRuntimeMessage, errorCb) {
     this._wssUri = _wssUri;
     this._errorCb = errorCb;
+    this._sendRuntimeMessage = sendRuntimeMessage;
     this._connect();
   }
 
@@ -113,7 +114,7 @@ class Peer {
 
   _handleRetrieve(message) {
     const { query, retrievalId } = message.data;
-    chrome.runtime.sendMessage(
+    this._sendRuntimeMessage(
       {
         type: "DATA_RETRIEVE",
         table: "shares",
@@ -125,6 +126,7 @@ class Peer {
           that._send("retrieved", { retrievalId, payload: data });
         } else {
           // TODO: send error to wss, for now log
+          // ... we need to differentiate between errors and simply not finding data
           console.log("Failed to retrieve data: " + response.error.message);
         }
       }
@@ -133,11 +135,11 @@ class Peer {
 
   _handleDistribute(message) {
     const { id, domain, data } = message.data;
-    chrome.runtime.sendMessage(
+    this._sendRuntimeMessage(
       {
         type: "DATA_STORE",
         table: "shares",
-        data: {
+        payload: {
           id,
           domain,
           data,

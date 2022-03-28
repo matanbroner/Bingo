@@ -71,6 +71,13 @@ const registerApi = async (payload) => {
         throw new Error("Invalid request body");
       }
       id = await mmh3(id);
+      const bingoUser = await db.dbQueryOne("users", {
+        id,
+        domainId: domainObj.id,
+      });
+      if (bingoUser) {
+        throw new Error("User already registered");
+      }
       delete payload.requestBody[domainObj.secretKey];
       const res = await superagent
         .post(url)
