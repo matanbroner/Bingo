@@ -2,14 +2,13 @@ const superagent = require("superagent");
 const fs = require("fs");
 const uuidV4 = require("uuid").v4;
 const path = require("path");
-const launchClients = require("./launchClients");
+const { launchClient } = require("./launchClients");
 
 const password = "Bingo123!";
 
 const registerUser = async (email, password) => {
   return new Promise(async (resolve, reject) => {
-    let ws = await launchClients(1);
-    ws = ws[0];
+    let ws = await launchClient();
     let ready = false;
     while (!ready) {
       if (ws.readyState === 1) {

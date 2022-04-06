@@ -6,11 +6,11 @@ const generateMessageId = () => uuidV4();
 
 const PROXY = "ws://localhost:5000";
 
-const launchClient = () => {
+const launchClient = (storage) => {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(PROXY);
-    ws.storage = {};
     ws.actions = {};
+    ws.storage = storage || {};
     ws.addAction = (type, cb) => {
       const id = uuidV4();
       ws.actions[id] = {
@@ -32,10 +32,11 @@ const launchClient = () => {
           case "distribute": {
             const { payload, distributionId } = message.data;
             const { domain, id, share } = payload;
-            // rudimentary storage, in real version allow multiple
-            // ... pieces of data to be stored per user
-            ws.storage[domain] = ws.storage[domain] || {};
-            ws.storage[domain][id] = share;
+            if(typeof ws.storage.store === "function") {
+              ws.storage.store(`${domain}.${id}`, share);
+            } else {
+              ws.storage[`${domain}.${id}`] = share;
+            }
             ws.send(
               JSON.stringify({
                 messageId: generateMessageId(),
@@ -53,8 +54,13 @@ const launchClient = () => {
             const { id, domain } = query;
             // In real version we can utilize more complex queries
             // ... for this version just use basic pKey
-            if (ws.storage[domain] && ws.storage[domain][id]) {
-              const payload = ws.storage[domain][id];
+            let payload;
+            if(typeof ws.storage.retrieve === "function") {
+              payload = ws.storage.retrieve(`${domain}.${id}`);
+            } else {
+              payload = ws.storage[`${domain}.${id}`];
+            }
+            if (payload) {
               console.log(
                 `ID ${id} for domain ${domain} retrieved: ${payload}`
               );
@@ -94,10 +100,13 @@ const launchClient = () => {
   });
 };
 
-module.exports = async (count = argv[2] || 1) => {
-  let clients = [];
-  for (let i = 0; i < count; i++) {
-    clients.push(await launchClient());
+module.exports = {
+  launchClient,
+  launchClients: async (count = argv[2] || 1) => {
+    let clients = [];
+    for (let i = 0; i < count; i++) {
+      clients.push(await launchClient());
+    }
+    return clients;
   }
-  return clients;
-};
+}

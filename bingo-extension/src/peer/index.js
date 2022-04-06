@@ -1,5 +1,4 @@
 const uuidV4 = require("uuid").v4;
-const crypto = require("crypto");
 
 const RECONNECT_TIMEOUT = 5000;
 
