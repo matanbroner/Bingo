@@ -80,11 +80,10 @@ class RetrievalJob {
 }
 
 class DistributeJob {
-  constructor(id, data, count, getCandidates, send, cb) {
+  constructor(id, data, getCandidates, send, cb) {
     this.id = id;
     this.cb = cb;
     this.data = data;
-    this.count = count;
     this.active = true;
     this.createdAt = new Date();
     this.updatedAt = new Date();
@@ -104,7 +103,7 @@ class DistributeJob {
       global.logger.debug(
         `Distribute job ${this.id} acked candidate: ${id}, now has ${this.ackedCandidates.size} acked`
       );
-      if (this.ackedCandidates.size >= this.count) {
+      if (this.ackedCandidates.size >= this.data.length) {
         this._complete();
       }
     }
@@ -125,6 +124,9 @@ class DistributeJob {
     this.timeout = setTimeout(() => {
       if (that.attempts > 0) {
         that.attempts--;
+        global.logger.debug(
+          `Distribute job ${this.id} timed out, ${this.attempts} attempts left`
+        );
         that._start();
       } else {
         that.cb(null, "Distribution timed out");
@@ -135,18 +137,20 @@ class DistributeJob {
   _send() {
     let candidates = this.getCandidates();
     if (candidates.length === 0) {
+      logger.debug(`Distribute job ${this.id} no candidates`);
       return;
     }
-    let remaining = this.count - this.ackedCandidates.size;
+    let remaining = this.data.length - this.ackedCandidates.size;
     if (remaining === 0) {
+      logger.debug(`Distribute job ${this.id} no remaining`);
       return;
     }
     let sentToCandiates = [];
     let ackedData = [...this.ackedCandidates].map((id) => {
       return this.usedCandidates[id];
     });
-    let remainingData = this.data.filter((data) => {
-      return !ackedData.includes(data.shareId);
+    let remainingData = this.data.filter((item) => {
+      return !ackedData.includes(item.data.payload.shareId);
     });
     // TODO: improve distribution mechanism
     // ... currently we distribute to n random peers
@@ -171,7 +175,7 @@ class DistributeJob {
       if (sendDataItem) {
         this.parentSend(ws, sendDataItem);
         sentToCandiates.push(id);
-        this.usedCandidates[id] = sendDataItem.shareId;
+        this.usedCandidates[id] = sendDataItem.data.payload.shareId;
       } else {
         break;
       }

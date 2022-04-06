@@ -39,14 +39,13 @@ const loginUser = async (email, password) => {
   });
 };
 
-(async () => {
+module.exports = async (email) => {
   try {
-    const email = "f8e90af3-1962-4835-98ac-7f7bc3e1c05f@bingo.com";
     const [ws, response] = await loginUser(email, password);
-    console.log(response);
     ws.close();
+    return Promise.resolve(response);
   } catch ([ws, error]) {
-    console.error(`Login error: ${JSON.stringify(error)}`);
     ws.close();
+    return Promise.reject(error);
   }
-})();
+}

@@ -6,7 +6,7 @@ const generateMessageId = () => uuidV4();
 
 const PROXY = "ws://localhost:5000";
 
-const launchClient = (storage) => {
+const launchClient = (storage, errCb = null) => {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(PROXY);
     ws.actions = {};
@@ -20,19 +20,23 @@ const launchClient = (storage) => {
       };
       return id;
     };
+    ws.on("error", (err) => {
+      if (errCb) {
+        errCb(err);
+      }
+    });
     ws.on("open", function open() {
       ws.on("message", function message(message) {
         message = JSON.parse(message);
         switch (message.type) {
           case "id": {
             ws._id = message.data.id;
-            console.log(`Connected: ${ws._id}`);
             break;
           }
           case "distribute": {
             const { payload, distributionId } = message.data;
             const { domain, id, share } = payload;
-            if(typeof ws.storage.store === "function") {
+            if (typeof ws.storage.store === "function") {
               ws.storage.store(`${domain}.${id}`, share);
             } else {
               ws.storage[`${domain}.${id}`] = share;
@@ -46,7 +50,6 @@ const launchClient = (storage) => {
                 },
               })
             );
-            console.log(`ID ${id} of domain ${domain} stored: ${share}`);
             break;
           }
           case "retrieve": {
@@ -55,15 +58,12 @@ const launchClient = (storage) => {
             // In real version we can utilize more complex queries
             // ... for this version just use basic pKey
             let payload;
-            if(typeof ws.storage.retrieve === "function") {
+            if (typeof ws.storage.retrieve === "function") {
               payload = ws.storage.retrieve(`${domain}.${id}`);
             } else {
               payload = ws.storage[`${domain}.${id}`];
             }
             if (payload) {
-              console.log(
-                `ID ${id} for domain ${domain} retrieved: ${payload}`
-              );
               ws.send(
                 JSON.stringify({
                   messageId: generateMessageId(),
@@ -83,7 +83,6 @@ const launchClient = (storage) => {
               : message.error.actionId;
             const action = ws.actions[actionId];
             if (action) {
-              console.log("Action update: " + actionId);
               action.completed = true;
               if (message.data) {
                 action.cb(message.data);
@@ -108,5 +107,5 @@ module.exports = {
       clients.push(await launchClient());
     }
     return clients;
-  }
-}
+  },
+};

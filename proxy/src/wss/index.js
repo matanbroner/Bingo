@@ -61,7 +61,6 @@ const promiseDistributeJob = (distributionId, items) => {
     distributeJobs[distributionId] = new DistributeJob(
       distributionId,
       items,
-      items.length * process.env.REPLICATION_FACTOR,
       wss.activeSockets,
       send,
       (data, err) => {
@@ -350,6 +349,7 @@ module.exports = {
     wss.on("connection", (ws) => {
       // Assign a unique ID to the client
       ws._id = uuidV4();
+      global.logger.debug(`Client ${ws._id} connected`);
       send(ws, {
         type: "id",
         data: {
@@ -386,7 +386,7 @@ module.exports = {
       ws.on("close", () => {
         // TODO: should the user be purged from cache?
         // ... by making the user inactive we prevent the need for another 4-way handshake
-        global.logger.info(`Client ${ws._id} disconnected`);
+        global.logger.debug(`Client ${ws._id} disconnected`);
         delete wss._active[ws._id];
       });
     });
