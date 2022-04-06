@@ -7,8 +7,9 @@ const domainTable = {
     registerRoute: "TEXT NOT NULL",
     idKey: "TEXT NOT NULL",
     secretKey: "TEXT NOT NULL",
-    shares: "NUMBER NOT NULL DEFAULT " + parseInt(process.env.SHARES),
-    threshold: "NUMBER NOT NULL DEFAULT " + parseInt(process.env.THRESHOLD),
+    shares: "NUMBER NOT NULL DEFAULT " + parseInt(process.env.SHARES) || 10,
+    threshold: "NUMBER NOT NULL DEFAULT " + parseInt(process.env.THRESHOLD) || 4,
+    replicationFactor: "NUMBER NOT NULL DEFAULT " + parseInt(process.env.REPLICATION_FACTOR) || 1,
   },
   constraints: [],
 };

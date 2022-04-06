@@ -18,7 +18,8 @@ const registerDomain = async (
   idKey,
   secretKey,
   shares,
-  threshold
+  threshold,
+  replicationFactor
 ) => {
   const id = await mmh3(domain);
   // Do not store password, pass it to relay server
@@ -31,6 +32,7 @@ const registerDomain = async (
     secretKey,
     shares,
     threshold,
+    replicationFactor,
   });
   return id;
 };
@@ -40,12 +42,13 @@ const registerDomain = async (
   const id = await registerDomain(
     "localhost",
     "http://localhost:8080/api",
-    "/login",
-    "/register",
+    "login",
+    "register",
     "email",
     "password",
     5,
-    3
+    3,
+    2
   );
-  console.log(id);
+  console.log(`Domain id: ${id}`);
 })();

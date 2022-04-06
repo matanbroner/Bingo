@@ -42,7 +42,7 @@ const loginUser = async (email, password) => {
 
 (async () => {
   try {
-    const email = "1c290333-9939-409b-97b3-0093328ff854@bingo.com"
+    const email = "097bb2c4-ee6c-4ac5-9973-4e6a9c3749bc@bingo.com"
     const [ws, response] = await loginUser(email, password);
     console.log(response);
     ws.close();

@@ -30,12 +30,22 @@ const launchClient = () => {
             break;
           }
           case "distribute": {
-            const { id, domain, data } = message.data;
+            const { payload, distributionId } = message.data;
+            const { domain, id, share } = payload;
             // rudimentary storage, in real version allow multiple
             // ... pieces of data to be stored per user
             ws.storage[domain] = ws.storage[domain] || {};
-            ws.storage[domain][id] = data;
-            console.log(`ID ${id} of domain ${domain} stored: ${data}`);
+            ws.storage[domain][id] = share;
+            ws.send(
+              JSON.stringify({
+                messageId: generateMessageId(),
+                type: "distributed",
+                data: {
+                  distributionId,
+                },
+              })
+            );
+            console.log(`ID ${id} of domain ${domain} stored: ${share}`);
             break;
           }
           case "retrieve": {
@@ -45,7 +55,9 @@ const launchClient = () => {
             // ... for this version just use basic pKey
             if (ws.storage[domain] && ws.storage[domain][id]) {
               const payload = ws.storage[domain][id];
-              console.log(`ID ${id} for domain ${domain} retrieved: ${payload}`);
+              console.log(
+                `ID ${id} for domain ${domain} retrieved: ${payload}`
+              );
               ws.send(
                 JSON.stringify({
                   messageId: generateMessageId(),

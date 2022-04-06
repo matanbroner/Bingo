@@ -3,7 +3,7 @@ const uuidV4 = require("uuid").v4;
 const superagent = require("superagent");
 const _ = require("lodash");
 const db = require("db");
-const RetrievalJob = require("./jobs").retrieval;
+const { RetrievalJob, DistributeJob } = require("./jobs");
 const mmh3 = require("../crypto").mmh3;
 const vss = require("../vss");
 
@@ -11,6 +11,7 @@ const generateMessageId = () => uuidV4();
 
 let wss = null;
 let retrievalJobs = {};
+let distributeJobs = {};
 
 const send = (ws, message) => {
   ws.send(
@@ -25,8 +26,44 @@ const promiseRetrievalJob = (retrievalId, query, threshold) => {
   return new Promise((resolve, reject) => {
     retrievalJobs[retrievalId] = new RetrievalJob(
       retrievalId,
-      query,
+      {
+        type: "retrieve",
+        data: {
+          query,
+          retrievalId,
+        },
+      },
       threshold,
+      wss.activeSockets,
+      send,
+      (data, err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(data);
+        }
+      }
+    );
+  });
+};
+
+const promiseDistributeJob = (distributionId, items) => {
+  items = items.map((item) => {
+    return {
+      type: "distribute",
+      data: {
+        distributionId,
+        payload: item,
+      },
+    };
+  });
+  return new Promise((resolve, reject) => {
+    distributeJobs[distributionId] = new DistributeJob(
+      distributionId,
+      items,
+      items.length * process.env.REPLICATION_FACTOR,
+      wss.activeSockets,
+      send,
       (data, err) => {
         if (err) {
           reject(err);
@@ -129,15 +166,20 @@ const generateShares = async (secret, domainObj, id) => {
         domainObj.shares,
         domainObj.threshold
       );
-      resolve(
-        shares.map((share) => {
-          return {
+      let retShares = [];
+      const replFactor =
+        domainObj.replicationFactor || process.env.REPLICATION_FACTOR;
+      for (let share of shares) {
+        for (let r = 0; r < replFactor; r++) {
+          retShares.push({
             domain: domainObj.id,
-            data: share,
+            share,
             id,
-          };
-        })
-      );
+            shareId: uuidV4(),
+          });
+        }
+      }
+      resolve(retShares);
     } catch (e) {
       reject(e);
     }
@@ -148,46 +190,16 @@ const distribute = async (items) => {
   if (!wss) {
     return Promise.reject(new Error("WSS not initialized"));
   }
-  const activeSockets = wss.activeSockets();
-  if (activeSockets.length < items.length * process.env.REPLICATION_FACTOR) {
-    return Promise.reject(new Error("Not enough active peers"));
-  }
-  // TODO: improve distribution mechanism
-  // ... currently we distribute to n random peers
-  // ... this later requires querying all peers to retrieve the data
-  // ... We choose the number of peers based on a replication factor
-
-  // TODO: use a distribution job to handle if not enough peers are available
-  // ... at the moment. We can wait for a new peer to join the network as needed.
-  const randomPeers = _.sampleSize(
-    activeSockets,
-    items.length * process.env.REPLICATION_FACTOR
-  );
-  // clone the items
-  items = Array.from(
-    { length: process.env.REPLICATION_FACTOR },
-    () => items
-  ).flat();
-  // give each peer one item
-  for (let [_, ws] of randomPeers) {
-    const item = items.pop();
-    send(ws, {
-      type: "distribute",
-      data: item,
-    });
-  }
+  const distributionId = uuidV4();
+  let distributionJob = promiseDistributeJob(distributionId, items);
   // TODO: send items to replication servers
 
-  return Promise.resolve();
+  return distributionJob;
 };
 
 const retrieve = async (query) => {
   if (!wss) {
     return Promise.reject(new Error("WSS not initialized"));
-  }
-  const activeSockets = wss.activeSockets();
-  if (activeSockets.length < process.env.THRESHOLD) {
-    return Promise.reject(new Error("No active peers"));
   }
   const retrievalId = uuidV4();
   let retrievalJob = promiseRetrievalJob(
@@ -195,18 +207,6 @@ const retrieve = async (query) => {
     query,
     parseInt(process.env.THRESHOLD)
   );
-  // TODO: make the retieve mechanism more efficient
-  // ... once we have a better distribution mechanism we can query only specific peers
-  // ... for now we query all peers
-  for (let [_, ws] of activeSockets) {
-    send(ws, {
-      type: "retrieve",
-      data: {
-        query,
-        retrievalId,
-      },
-    });
-  }
   return retrievalJob;
 };
 
@@ -238,6 +238,34 @@ const acceptRetrievedData = async (wss, ws, json) => {
     global.logger.error(e);
   }
 };
+
+const acceptDistributedAck = async (wss, ws, json) => {
+  const { messageId, data } = json;
+  const { distributionId } = data;
+  global.logger.debug(`Received distributed ACK for distribution ${distributionId}`);
+  try {
+    if (!distributionId) {
+      global.logger.error(`Invalid distributionId: ${distributionId}`);
+      return;
+    }
+    const job = distributeJobs[distributionId];
+    if (!job) {
+      global.logger.error(`Invalid distributionId: ${distributionId}`);
+      return;
+    }
+    if (job.active) {
+      job.push(ws._id);
+      global.logger.debug(`Distributed ACK pushed to job: ${distributionId} by ${ws._id}`);
+    }
+  } catch (e) {
+    send(ws, {
+      replyId: messageId,
+      type: "error",
+      error: e.message,
+    });
+    global.logger.error(e);
+  }
+}
 
 const action = async (wss, ws, json) => {
   const { messageId, data } = json;
@@ -346,6 +374,9 @@ module.exports = {
             break;
           case "retrieved":
             acceptRetrievedData(wss, ws, data);
+            break;
+          case "distributed":
+            acceptDistributedAck(wss, ws, data);
             break;
           default:
             break;
