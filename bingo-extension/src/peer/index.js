@@ -134,7 +134,8 @@ class Peer {
   }
 
   _handleDistribute(message) {
-    const { id, domain, data } = message.data;
+    const { distributionId, payload } = message.data;
+    const { id, domain, share } = payload;
     this._sendRuntimeMessage(
       {
         type: "DATA_STORE",
@@ -142,13 +143,15 @@ class Peer {
         payload: {
           id,
           domain,
-          data,
+          share,
         },
       },
       (response) => {
         if (response.type !== "SUCCESS") {
           // TODO: send error to wss, for now log
           console.log("Failed to store share data: " + response.error.message);
+        } else {
+          that._send("distributed", { distributionId });
         }
       }
     );
