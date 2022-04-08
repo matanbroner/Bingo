@@ -1,15 +1,16 @@
 const logger = require("logger");
 const uuidV4 = require("uuid").v4;
 const { launchClient } = require("./launchClients");
+const { getSchedule } = require("./assets/schedule");
 
 const COUNT = process.argv[2] || 100;
 const CLOCK_INTERVAL_MINUTES = 1;
-const MIN_INTERVAL = process.argv[3] || 10; // 10 minutes
-const MAX_INTERVAL = process.argv[4] || 180; // 3 hours
 const NIGHT_OWL_SIGN = "🌙";
 const NOT_NIGHT_OWL_SIGN = "🌞";
+const GREEN_CHECKBOX_EMOJI = "✅";
+const RED_X_EMOJI = "❌";
 
-let clients = [];
+let peers = {};
 
 const log = new logger.Logger({
   level: "debug",
@@ -23,7 +24,10 @@ const log = new logger.Logger({
  */
 const clock = (increment) => {
   let _clock = {};
-  _clock.hour = 0;
+  _clock.alarms = {};
+  _clock.increment = increment;
+  // clock starts at 6AM
+  _clock.hour = 6;
   _clock.minute = 0;
 
   _clock.start = () => {
@@ -36,6 +40,14 @@ const clock = (increment) => {
       if (_clock.hour >= 24) {
         _clock.hour = _clock.hour % 24;
       }
+      const alarms = _clock.alarms[_clock.stringTime()];
+      if (alarms && alarms.length) {
+        alarms.forEach((alarm) => {
+          alarm.callback();
+        });
+      }
+      _clock.alarms[_clock.stringTime()] = [];
+      logPeerInfoTable();
     }, 1000);
   };
   _clock.stop = () => {
@@ -53,15 +65,55 @@ const clock = (increment) => {
     return [_clock.hour, _clock.minute];
   };
 
-  _clock.stringTime = () => {
-    const pm = _clock.hour >= 12;
-    const hour = _clock.hour < 10 ? `0${_clock.hour}` : _clock.hour;
-    const minute = _clock.minute < 10 ? `0${_clock.minute}` : _clock.minute;
+  _clock.setAlarm = (seconds, callback) => {
+    const [hour, minute] = _clock.simulatedTime(seconds);
+    const key = _clock.stringTime(hour, minute);
+    const id = `${key}-${uuidV4()}`;
+    if (!_clock.alarms[key]) {
+      _clock.alarms[key] = [{ id, callback }];
+    } else {
+      _clock.alarms[key].push({ id, callback });
+    }
+    return id;
+  };
+
+  _clock.clearAlarm = (id) => {
+    const time = id.split("-")[0];
+    if (time in _clock.alarms) {
+      _clock.alarms[time] = _clock.alarms[time].filter(
+        (alarm) => alarm.id !== id
+      );
+    }
+  };
+
+  _clock.simulatedTime = (seconds) => {
+    let [currentHour, currentMinute] = _clock.getTime();
+    let minutes = seconds * _clock.increment;
+    let hour = Math.floor(minutes / 60);
+    minutes = minutes % 60;
+    currentHour += hour;
+    currentMinute += minutes;
+    while (currentMinute >= 60) {
+      currentHour += Math.floor(currentMinute / 60);
+      currentMinute = currentMinute % 60;
+    }
+    while (currentHour >= 24) {
+      currentHour = currentHour % 24;
+    }
+    return [currentHour, currentMinute];
+  };
+
+  _clock.stringTime = (hour = null, minute = null) => {
+    hour = typeof hour === "number" ? hour : _clock.hour;
+    minute = typeof minute === "number" ? minute : _clock.minute;
+    const pm = hour >= 12;
+    hour = hour < 10 ? `0${hour}` : hour;
+    minute = minute < 10 ? `0${minute}` : minute;
     return `${hour}:${minute} ${pm ? "PM" : "AM"}`;
   };
 
   _clock.isNight = () => {
-    return _clock.hour < 6 || _clock.hour > 18;
+    return _clock.hour < 6 || _clock.hour >= 21;
   };
 
   return _clock;
@@ -79,7 +131,8 @@ const shareStorage = () => {
 };
 
 const isNightOwl = () => {
-  return Math.floor(Math.random() * 2) == 0;
+  // low chance of night owl
+  return Math.random() < 0.3 ? true : false;
 };
 
 class PeerWrapper {
@@ -89,26 +142,19 @@ class PeerWrapper {
     this.shareStorage = shareStorage();
     this.clock = clock;
     this.nightOwl = isNightOwl();
-    // prevent everyone from starting at the same time
-    setTimeout(() => {
-      this.cycle();
-    }, this.chooseInterval(true) * 1000);
+    this.schedule = getSchedule({
+      isNightOwl: this.nightOwl,
+      clock: this.clock,
+      hoursOnline: Math.floor(Math.random() * (7 - 4 + 1)) + 4, // 4-7 hours online per day
+      secondToMinute: this.clock.increment,
+      start: this.start.bind(this),
+      stop: this.stop.bind(this),
+    });
+    this.cycle();
   }
 
   async cycle() {
-    await this.start();
-    if (!this.ws) {
-      log.error(`Client failed to initialize cycle: ${this.id}`);
-      return;
-    }
-    // choose random interval between MIN_INTERVAL and MAX_INTERVAL to stop
-    setTimeout(() => {
-      this.stop();
-    }, this.chooseInterval(false) * 1000);
-    // choose random interval between MIN_INTERVAL and MAX_INTERVAL to start
-    setTimeout(() => {
-      this.cycle();
-    }, this.chooseInterval(true) * 1000);
+    this.schedule.start();
   }
 
   async start() {
@@ -116,11 +162,6 @@ class PeerWrapper {
       this.ws = await launchClient(this.shareStorage, (err) => {
         log.error(`WS ID ${this.id} error: ${err}`);
       });
-      log.debug(
-        `[${
-          this.nightOwl ? NIGHT_OWL_SIGN : NOT_NIGHT_OWL_SIGN
-        }] Client started at time ${this.clock.stringTime()}: ${this.id}`
-      );
     } catch (e) {
       log.error(`Client failed to start: ${this.id}`);
     }
@@ -130,60 +171,44 @@ class PeerWrapper {
     if (this.ws) {
       this.ws.close();
       this.ws = null;
-      log.debug(
-        `[${
-          this.nightOwl ? NIGHT_OWL_SIGN : NOT_NIGHT_OWL_SIGN
-        }] Client stopped at time ${this.clock.stringTime()}: ${this.id}`
-      );
-    }
-  }
-
-  chooseInterval(isStartInterval) {
-    if (
-      (this.nightOwl && this.clock.isNight()) ||
-      (!this.nightOwl && !this.clock.isNight())
-    ) {
-      // peer is more likely to be up, shorter interval to start
-      // ... and longer interval to stop
-      if (isStartInterval) {
-        // scale back max interval by 1.5
-        return (
-          Math.floor(Math.random() * (MAX_INTERVAL / 1.5 - MIN_INTERVAL)) +
-          MIN_INTERVAL
-        );
-      } else {
-        // scale up min interval by 1.5
-        return (
-          Math.floor(Math.random() * (MAX_INTERVAL - MIN_INTERVAL * 1.5)) +
-          MIN_INTERVAL * 1.5
-        );
-      }
-    } else {
-      // peer is less likely to be up, longer interval to start
-      // ... and shorter interval to stop
-      if (isStartInterval) {
-        // scale up min interval by 1.5
-        return (
-          Math.floor(Math.random() * (MAX_INTERVAL - MIN_INTERVAL * 1.5)) +
-          MIN_INTERVAL * 1.5
-        );
-      } else {
-        // scale back max interval by 1.5
-        return (
-          Math.floor(Math.random() * (MAX_INTERVAL / 1.5 - MIN_INTERVAL)) +
-          MIN_INTERVAL
-        );
-      }
     }
   }
 }
 
+const logPeerInfoTable = () => {
+  process.stdout.write("\033c");
+  let peerInstances = Object.values(peers);
+  log.info(
+    `Information for ${
+      peerInstances.length
+    } peers at time [${peerClock.stringTime()}]`
+  );
+  log.info(
+    `Current phase: ${
+      peerClock.isNight()
+        ? `Night ${NIGHT_OWL_SIGN}`
+        : `Day ${NOT_NIGHT_OWL_SIGN}`
+    }`
+  );
+  const rows = peerInstances.map((peer) => {
+    const { id, nightOwl, ws, schedule } = peer;
+    const info = schedule.info();
+    return {
+      id,
+      ["Owl?"]: nightOwl ? NIGHT_OWL_SIGN : NOT_NIGHT_OWL_SIGN,
+      ["Active?"]: ws ? GREEN_CHECKBOX_EMOJI : RED_X_EMOJI,
+      ["Online Hrs."]: info.hoursOnline,
+      ["Chart"]: schedule.getLineChart().print(),
+    };
+  });
+  console.table(rows);
+};
 
 // global synchronized clock for all peers
 const peerClock = clock(CLOCK_INTERVAL_MINUTES);
 peerClock.start();
 
 for (let i = 0; i < COUNT; i++) {
-  const client = new PeerWrapper(peerClock);
-  clients.push(client);
+  const peer = new PeerWrapper(peerClock);
+  peers[peer.id] = peer;
 }

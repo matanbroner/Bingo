@@ -19,8 +19,8 @@ const results = {
   failure: 0,
 };
 
-for (let i = 0; i < LOGIN_TIMES; i++) {
-  setTimeout(async () => {
+(async () => {
+  for (let i = 0; i < LOGIN_TIMES; i++) {
     try {
       // choose random email from list
       const email = EMAILS[Math.floor(Math.random() * EMAILS.length)];
@@ -31,5 +31,11 @@ for (let i = 0; i < LOGIN_TIMES; i++) {
       results.failure++;
       log.debug(`Failed login attempt ${i + 1}`);
     }
-  }, LOGIN_WAIT_INTERVAL_SECONDS * 1000 * i); // prevent all timeouts from happening at the same time
-}
+    await new Promise((resolve) =>
+      setTimeout(resolve, LOGIN_WAIT_INTERVAL_SECONDS * 1000)
+    );
+  }
+  log.debug(`Successful login attempts: ${results.success}`);
+  log.debug(`Failed login attempts: ${results.failure}`);
+  log.debug(`Success rate: ${(results.success / LOGIN_TIMES) * 100}%`);
+})();

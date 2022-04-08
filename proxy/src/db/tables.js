@@ -19,6 +19,7 @@ const userTable = {
   columns: {
     id: "TEXT NOT NULL UNIQUE",
     domainId: "TEXT NOT NULL",
+    secretVersion: "NUMBER NOT NULL DEFAULT 0",
   },
   constraints: [
     "FOREIGN KEY (domainId) REFERENCES domains(id) ON DELETE CASCADE",
