@@ -18,24 +18,23 @@ Users with the Bingo browser extension installed connect to the proxy server usi
 Bingo is still in early development. Formal deployment instructions to come.
 
 ## Source Code Directories
-
 <ul>
   <li>
-    `bingo-extension`: The browser extension that provides the user interface for Bingo. Currrently the only supported platform is Chrome.
+    bingo-extension: The browser extension that provides the user interface for Bingo. Currrently the only supported platform is Chrome.
   </li>
   <li>
-    `bingo-server`: A simple REST server with an exposed /register and /login API, which serves as an example of the way a third party should configure its API to work with Bingo.
+    bingo-server: A simple REST server with an exposed /register and /login API, which serves as an example of the way a third party should configure its API to work with Bingo.
   </li>
   <li>
-    `bingo-ui`: The UI elements that are used to communicate with the proxy server. A sample application is provided to show how UI elements should be configured to communicate with the browser extension.
+    bingo-ui: The UI elements that are used to communicate with the proxy server. A sample application is provided to show how UI elements should be configured to communicate with the browser extension.
   </li>
   <li>
-    `proxy`: The proxy server that is used to communicate with the third party service. Most of the important functionality for Bingo and configuration for a deployment is found here.
+    proxy: The proxy server that is used to communicate with the third party service. Most of the important functionality for Bingo and configuration for a deployment is found here.
   </li>
   <li>
-    `relay`: A simple relay server which Bingo can optionally deploy to store shares of other users' secrets. This can improve performance by making stronger guarantees of a user's ability to succesfully register and login.
+    relay: A simple relay server which Bingo can optionally deploy to store shares of other users' secrets. This can improve performance by making stronger guarantees of a user's ability to succesfully register and login.
   </li>
   <li>
-    `tools`: A set of tools used by Bingo. These should not be tampered with during deployment.
+    tools: A set of tools used by Bingo. These should not be tampered with during deployment.
   </li>
 </ul>
