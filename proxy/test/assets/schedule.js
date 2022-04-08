@@ -125,7 +125,7 @@ const getSchedule = (options) => {
                 let timeout = activeTimeoutsCopy.shift();
                 updateTimeInPhase(timeout);
                 // BUG: +1 needed to line up with line chart
-                activeAlarmId = clock.setAlarm(timeout + 1, () => {
+                activeAlarmId = clock.setAlarm(timeout, () => {
                   wsActive = false;
                   stop();
                   handleTimeout();
