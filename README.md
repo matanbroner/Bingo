@@ -15,7 +15,7 @@ Bingo is a distributed password storage mechanism using verifiable secret sharin
 Users with the Bingo browser extension installed connect to the proxy server using a WebSocket connection. The WebSocket verifies the correct installation of the extension and communicates with Bingo's embedded UI elements when a registration or login is requested. Just as modern 2FA services use an embedded UI to communicate with their servers, Bingo's UI elements do not contact a third party's central server directly, rather they communicate with the proxy server.
 
 ## Deploying Bingo
-Bingo is still in early development. Propoer deployment instructions to come.
+Bingo is still in early development. Formal deployment instructions to come.
 
 ## Source Code Directories
 
